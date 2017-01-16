@@ -15,7 +15,8 @@
  *
  *  You should have received a copy of the GNU General Public License
  *  along with XBMC; see the file COPYING.  If not, write to
- *  the Free Software Foundation, 675 Mass Ave, Cambridge, MA 02139, USA.
+ *  the Free Software Foundation, 51 Franklin Street, Fifth Floor, Boston,
+ *  MA 02110-1301  USA
  *  http://www.gnu.org/copyleft/gpl.html
  *
  */
@@ -158,11 +159,11 @@ bool PVRDemoData::LoadChannelsData(const std::string& strM3uPath, bool bIsOnLine
 	if (logoCfgFile.at(logoCfgFile.size() - 1) == '\\' ||
 		logoCfgFile.at(logoCfgFile.size() - 1) == '/')
 	{
-		logoCfgFile.append("canal_list.py");
+		logoCfgFile.append("logo.ini");
 	}
 	else
 	{
-		logoCfgFile.append("\\canal_list.py");
+		logoCfgFile.append("\\logo.ini");
 	}
 
 	void* hFile = XBMC->OpenFile(logoCfgFile.c_str(), 0);
@@ -976,13 +977,9 @@ PVR_ERROR PVRDemoData::GetChannels(ADDON_HANDLE handle, bool bRadio)
 	  //strncpy(xbmcChannel.strStreamURL, channel.strStreamURL.c_str(), sizeof(xbmcChannel.strStreamURL) - 1);
 	  xbmcChannel.iEncryptionSystem = channel.bIsTcpTransport?0:channel.iEncryptionSystem;
 	  //PVR_STRCPY(xbmcChannel.strInputFormat, "video/x-mpegts");
-	  if(channel.bRadio)
+	  if(!channel.bRadio)
 	  {
-        PVR_STRCPY(xbmcChannel.strInputFormat, "audio/mpeg");
-      }
-	  else
-      {
-        PVR_STRCPY(xbmcChannel.strInputFormat, "video/x-mpegts");
+        PVR_STRCPY(xbmcChannel.strInputFormat, "video/mp2t");
 	  }
       strncpy(xbmcChannel.strIconPath, channel.strIconPath.c_str(), sizeof(xbmcChannel.strIconPath) - 1);
       xbmcChannel.bIsHidden         = false;
@@ -1158,6 +1155,17 @@ PVR_ERROR PVRDemoData::RequestWebEPGForChannel(ADDON_HANDLE handle, const PVRDem
 			int iTmp;
 			PVRDemoEpgEntry entry;
 
+			const TiXmlNode* pNode = pProgramNode->FirstChild();
+			if (pNode != NULL)
+			{
+				strTmp = pNode->Value();
+			}
+
+			if (strTmp.IsEmpty())
+			{
+				continue;
+			}
+
 			/* start */
 			if (
 				(lpszTmp = pProgramElement->Attribute("start"))
@@ -1186,12 +1194,6 @@ PVR_ERROR PVRDemoData::RequestWebEPGForChannel(ADDON_HANDLE handle, const PVRDem
 				continue;
 			}
 
-			const TiXmlNode* pNode = pProgramNode->FirstChild();
-			if (pNode != NULL)
-			{
-				strTmp = pNode->Value();
-			}
-
 			/* broadcast id */
 			entry.iBroadcastId = ++iUniqueBroadcastId;
 
@@ -1203,10 +1205,14 @@ PVR_ERROR PVRDemoData::RequestWebEPGForChannel(ADDON_HANDLE handle, const PVRDem
 			entry.strTitle = strTmp;
 
 			/* plot */
-			entry.strPlot = strTmp;
+			if (lpszTmp = pProgramElement->Attribute("description"))
+			{
+				entry.strPlot = lpszTmp;
+				//XBMC->Log(LOG_DEBUG, "%s - description: %s", __FUNCTION__, lpszTmp);
+			}
 
 			/* plot outline */
-			entry.strPlotOutline = m_strDefaultIcon.c_str();
+			//entry.strPlotOutline = m_strDefaultIcon.c_str();
 			entry.strIconPath = m_strDefaultIcon.c_str();
 
 			/* icon path */
@@ -1215,6 +1221,20 @@ PVR_ERROR PVRDemoData::RequestWebEPGForChannel(ADDON_HANDLE handle, const PVRDem
 				entry.strIconPath = lpszTmp;
 				entry.strPlotOutline = lpszTmp;
 				//XBMC->Log(LOG_DEBUG, "%s - icon path: %s", __FUNCTION__, lpszTmp);
+			}
+
+			/* parental rating */
+			entry.iParentalRating = 0;
+			if (lpszTmp = pProgramElement->Attribute("age_rating"))
+			{
+				strTmp = lpszTmp;
+				if (*strTmp.crbegin() == '+')
+				{
+					strTmp = strTmp.TrimRight('+');
+					entry.iParentalRating = atoi(strTmp);
+				}
+
+				//XBMC->Log(LOG_DEBUG, "%s - age rating: %s", __FUNCTION__, lpszTmp);
 			}
 
 			//XBMC->Log(LOG_DEBUG, "loaded EPG entry '%s' channel '%d' start '%d' end '%d'",
@@ -1243,6 +1263,7 @@ PVR_ERROR PVRDemoData::RequestWebEPGForChannel(ADDON_HANDLE handle, const PVRDem
 			tag.strIconPath        = myTag.strIconPath.c_str();
 			//tag.iGenreType         = myTag.iGenreType;
 			//tag.iGenreSubType      = myTag.iGenreSubType;
+			tag.iParentalRating    = myTag.iParentalRating;
 
 			PVR->TransferEpgEntry(handle, &tag);
 		}

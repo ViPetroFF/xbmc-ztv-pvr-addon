@@ -14,7 +14,8 @@
  *
  *  You should have received a copy of the GNU General Public License
  *  along with XBMC; see the file COPYING.  If not, write to
- *  the Free Software Foundation, 675 Mass Ave, Cambridge, MA 02139, USA.
+ *  the Free Software Foundation, 51 Franklin Street, Fifth Floor, Boston,
+ *  MA 02110-1301  USA
  *  http://www.gnu.org/copyleft/gpl.html
  *
  */
@@ -341,11 +342,9 @@ unsigned int ADDON_GetSettings(ADDON_StructSetting ***sSet)
 
 ADDON_STATUS ADDON_SetSetting(const char *settingName, const void *settingValue)
 {
+#if 0
   string str = settingName;
 
-  // SetSetting can occur when the addon is enabled, but TV support still
-  // disabled. In that case the addon is not loaded, so we should not try
-  // to change its settings.
   if (!XBMC)
     return ADDON_STATUS_OK;
 
@@ -421,7 +420,7 @@ ADDON_STATUS ADDON_SetSetting(const char *settingName, const void *settingValue)
       g_iPortProxy = *(int*) settingValue;
     }
   }
-
+#endif // 0
   return ADDON_STATUS_NEED_RESTART;
 }
 
@@ -489,7 +488,7 @@ const char *GetBackendName(void)
 
 const char *GetBackendVersion(void)
 {
-  static CStdString strBackendVersion = "0.1";
+  static CStdString strBackendVersion = "1.1";
   return strBackendVersion.c_str();
 }
 
@@ -656,11 +655,9 @@ long long PositionRecordedStream(void) { return -1; }
 long long LengthRecordedStream(void) { return 0; }
 void DemuxReset(void) {}
 void DemuxFlush(void) {}
-//int ReadLiveStream(unsigned char *pBuffer, unsigned int iBufferSize) { return 0; }
 long long SeekLiveStream(long long iPosition, int iWhence /* = SEEK_SET */) { return -1; }
 long long PositionLiveStream(void) { return -1; }
 long long LengthLiveStream(void) { return -1; }
-//const char * GetLiveStreamURL(const PVR_CHANNEL &channel) { return ""; }
 PVR_ERROR DeleteRecording(const PVR_RECORDING &recording) { return PVR_ERROR_NOT_IMPLEMENTED; }
 PVR_ERROR RenameRecording(const PVR_RECORDING &recording) { return PVR_ERROR_NOT_IMPLEMENTED; }
 PVR_ERROR SetRecordingPlayCount(const PVR_RECORDING &recording, int count) { return PVR_ERROR_NOT_IMPLEMENTED; }
@@ -675,9 +672,6 @@ PVR_ERROR UpdateTimer(const PVR_TIMER &timer) { return PVR_ERROR_NOT_IMPLEMENTED
 void DemuxAbort(void) {}
 DemuxPacket* DemuxRead(void) { return NULL; }
 unsigned int GetChannelSwitchDelay(void) { return 0; }
-//void PauseStream(bool bPaused) {}
-//bool CanPauseStream(void) { return false; }
-//bool CanSeekStream(void) { return false; }
 bool SeekTime(int,bool,double*) { return false; }
 void SetSpeed(int) {};
 time_t GetPlayingTime() { return 0; }

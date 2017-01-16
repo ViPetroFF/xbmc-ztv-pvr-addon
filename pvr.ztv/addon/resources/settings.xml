@@ -11,7 +11,6 @@
 	<setting id="sepm3u" label="30011" type="lsep" visible="eq(-5,1)"/>
 	<setting id="groupenable" type="bool" label="30001" default="true" visible="!eq(-6,0)" enable="eq(-6,1)"/>
 	<setting id="mac" type="text" label="30002" default="00:00:00:00:00:00" visible="!eq(-7,0)"/>
-    <!-- <setting id="pin" type="text" label="30002" default="0000" /> -->
   </category>
 
   <!-- UDP Proxy -->

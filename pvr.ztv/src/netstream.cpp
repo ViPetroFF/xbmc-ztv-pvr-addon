@@ -13,7 +13,8 @@
  *
  *  You should have received a copy of the GNU General Public License
  *  along with XBMC; see the file COPYING.  If not, write to
- *  the Free Software Foundation, 675 Mass Ave, Cambridge, MA 02139, USA.
+ *  the Free Software Foundation, 51 Franklin Street, Fifth Floor, Boston,
+ *  MA 02110-1301  USA
  *  http://www.gnu.org/copyleft/gpl.html
  *
  */
@@ -436,7 +437,7 @@ protected:
 	void ThrowException(LPCSTR szFuncName)
 	{
 		int iErrCode = getLastError();
-		throw system_error(static_cast<error_code::value_type>(iErrCode), system_category(), errormessage(iErrCode, szFuncName).c_str());
+		throw system_error(iErrCode, system_category(), errormessage(iErrCode, szFuncName).c_str());
 	}
 
 	int ReadBuffer(PBYTE buffer, int offset, int count)
@@ -516,7 +517,7 @@ friend class INetStreamFactory;
 		_streamHandle = XBMC->OpenFile(strUrl, 0);
 		if (NULL == _streamHandle)
 		{
-			throw system_error(static_cast<error_code::value_type>(-1), system_category(), strUrl.c_str());
+			throw system_error(-1, system_category(), strUrl.c_str());
 		}
 	}
 

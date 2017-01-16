@@ -13,7 +13,8 @@
  *
  *  You should have received a copy of the GNU General Public License
  *  along with XBMC; see the file COPYING.  If not, write to
- *  the Free Software Foundation, 675 Mass Ave, Cambridge, MA 02139, USA.
+ *  the Free Software Foundation, 51 Franklin Street, Fifth Floor, Boston,
+ *  MA 02110-1301  USA
  *  http://www.gnu.org/copyleft/gpl.html
  *
  */
@@ -554,14 +555,14 @@ void CLibVLCModule::CAPluginZetInit(const CStdString&  cstrInitParam)
             }
             else
             {
-				system_error err(static_cast<error_code::value_type>(GetLastError()), system_category(), dlerror());
+				system_error err(GetLastError(), system_category(), dlerror());
 				dlclose(hmodCAPluginZet);
 				throw err;
             }
         }
         else
         {
-			throw system_error(static_cast<error_code::value_type>(GetLastError()), system_category(), dlerror());
+			throw system_error(GetLastError(), system_category(), dlerror());
         }
     }
 }
@@ -589,14 +590,14 @@ bool CLibVLCModule::CALibVLCHookLoad()
             }
             else
             {
-				system_error err(static_cast<error_code::value_type>(GetLastError()), system_category(), dlerror());
+				system_error err(GetLastError(), system_category(), dlerror());
 				dlclose(hmodCALibVLCHook);
 				throw err;
             }
         }
         else
         {
-			throw system_error(static_cast<error_code::value_type>(GetLastError()), system_category(), dlerror());
+			throw system_error(GetLastError(), system_category(), dlerror());
         }
     }
 
@@ -635,7 +636,7 @@ void CLibVLCModule::CALibVLCHookInit(LPCSTR lpszCAMac, ULONG ulMCastIPAddr, int 
 				{
 					//throw new Win32Exception((int)status);
 					SetLastError(status);
-					throw system_error(static_cast<error_code::value_type>(GetLastError()), system_category(), dlerror());
+					throw system_error(GetLastError(), system_category(), dlerror());
 				}
 				_GetBestMacAddress = reinterpret_cast<DWORD (WINAPI *)(PUCHAR uchPhysAddr, DWORD dwSize)>(funcaddrGet);
 			}
@@ -643,21 +644,21 @@ void CLibVLCModule::CALibVLCHookInit(LPCSTR lpszCAMac, ULONG ulMCastIPAddr, int 
 			{
 				//int iErrCode = Marshal.GetLastWin32Error();
 				//throw new Win32Exception(Marshal.GetLastWin32Error());
-				throw system_error(static_cast<error_code::value_type>(GetLastError()), system_category(), dlerror());
+				throw system_error(GetLastError(), system_category(), dlerror());
 			}
         }
         else
         {
             //int iErrCode = Marshal.GetLastWin32Error();
             //throw new Win32Exception(Marshal.GetLastWin32Error());
-			throw system_error(static_cast<error_code::value_type>(GetLastError()), system_category(), dlerror());
+			throw system_error(GetLastError(), system_category(), dlerror());
         }
     }
     else
     {
         //throw new Win32Exception((int)1157L);
 		SetLastError(1157L);
-		throw system_error(static_cast<error_code::value_type>(GetLastError()), system_category(), dlerror());
+		throw system_error(GetLastError(), system_category(), dlerror());
     }
 }
 
@@ -670,27 +671,27 @@ void CLibVLCModule::LibVLCInit(const CStdStringArray& args)
 		libvlc_exception_init = reinterpret_cast<void (*)(libvlc_exception_t* pExp)>(dlsym(_hmodLibVLC, "libvlc_exception_init"));
 		if (NULL == libvlc_exception_init)
 		{
-			throw system_error(static_cast<error_code::value_type>(GetLastError()), system_category(), dlerror());
+			throw system_error(GetLastError(), system_category(), dlerror());
 		}
 		libvlc_exception_raised = reinterpret_cast<int (*)(libvlc_exception_t* pExp)>(dlsym(_hmodLibVLC, "libvlc_exception_raised"));
 		if (NULL == libvlc_exception_raised)
 		{
-			throw system_error(static_cast<error_code::value_type>(GetLastError()), system_category(), dlerror());
+			throw system_error(GetLastError(), system_category(), dlerror());
 		}
 		libvlc_new = reinterpret_cast<libvlc_instance_t* (*)(int nArgc, const char *const * Args, libvlc_exception_t* pExp)>(dlsym(_hmodLibVLC, "libvlc_new"));
 		if (NULL == libvlc_new)
 		{
-			throw system_error(static_cast<error_code::value_type>(GetLastError()), system_category(), dlerror());
+			throw system_error(GetLastError(), system_category(), dlerror());
 		}
 		libvlc_release = reinterpret_cast<void (*)(libvlc_instance_t* plibVLC)>(dlsym(_hmodLibVLC, "libvlc_release"));
 		if (NULL == libvlc_release)
 		{
-			throw system_error(static_cast<error_code::value_type>(GetLastError()), system_category(), dlerror());
+			throw system_error(GetLastError(), system_category(), dlerror());
 		}
 	}
 	else
 	{
-		throw system_error(static_cast<error_code::value_type>(GetLastError()), system_category(), dlerror());
+		throw system_error(GetLastError(), system_category(), dlerror());
 	}
 
 	libvlc_exception_t exp={0};
@@ -710,7 +711,7 @@ void CLibVLCModule::LibVLCInit(const CStdStringArray& args)
     {
         //Console.WriteLine("Error: {0}", exp.psz_message);
         //throw new Win32Exception(exp.psz_message);
-		throw system_error(static_cast<error_code::value_type>(-1), system_category(), exp.psz_message);
+		throw system_error(-1, system_category(), exp.psz_message);
     }
     else
     {
@@ -737,13 +738,13 @@ void CLibVLCModule::LibVLCCoreInit()
         else
         {
             //throw new Win32Exception(Marshal.GetLastWin32Error());
-			throw system_error(static_cast<error_code::value_type>(GetLastError()), system_category(), dlerror());
+			throw system_error(GetLastError(), system_category(), dlerror());
         }
     }
     else
     {
         //throw new Win32Exception(Marshal.GetLastWin32Error());
-		throw system_error(static_cast<error_code::value_type>(GetLastError()), system_category(), dlerror());
+		throw system_error(GetLastError(), system_category(), dlerror());
     }
 }
 
@@ -872,11 +873,11 @@ friend class CLibVLCAccess;
 			if (!rc)
 			{
 				SetLastError(WSAETIMEDOUT);
-				throw system_error(static_cast<error_code::value_type>(GetLastError()), system_category(), "Initial read operation timed out.");
+				throw system_error(GetLastError(), system_category(), "Initial read operation timed out.");
 			}
 			else if( SOCKET_ERROR == rc )
 			{
-				throw system_error(static_cast<error_code::value_type>(WSAGetLastError()), system_category(), "Initial read operation error.");
+				throw system_error(WSAGetLastError(), system_category(), "Initial read operation error.");
 			}
         }
         else
