@@ -1,4 +1,3 @@
-#pragma once
 /*
  *      Copyright (C) 2005-2011 Team XBMC
  *      http://www.xbmc.org
@@ -16,17 +15,15 @@
  *  You should have received a copy of the GNU General Public License
  *  along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
+#pragma once
+
 #include <string>
 #include <vector>
 #include <ctime>
-//#include "uri.h"
 #include "platform/util//util.h"
-
-#define TARGET_WINDOWS
 
 #ifdef TARGET_WINDOWS
 #include "platform/util/StdString.h"
-//#include "windows/WindowsUtils.h"
 #endif
 
 using namespace std;

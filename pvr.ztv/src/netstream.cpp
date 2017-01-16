@@ -19,8 +19,6 @@
  *
  */
 
-#include <iostream>
-#include "Ws2tcpip.h"
 #include "platform/util/StdString.h"
 #include "utils.h"
 #include "comstream.h"
@@ -36,6 +34,7 @@ using namespace ADDON;
 
 #define UDP_TX_BUF_SIZE 32768
 #define UDP_MAX_PKT_SIZE 65536
+#define UDP_HEADER_SIZE 8
 
 namespace LibNetStream 
 {
@@ -140,7 +139,7 @@ friend class INetStreamFactory;
 		//addr.sin_addr.s_addr = htonl(INADDR_ANY);
 		addr.sin_addr.s_addr = _ulMCastIf;
 
-		if (bind_ret < 0 && ::bind(_sd, (struct sockaddr *)&addr, len) < 0)
+		if (bind_ret < 0) //&& ::bind(_sd, (struct sockaddr *)&addr, len) < 0)
 		{
 			closesocket(_sd);
 			ThrowException("bind");
@@ -216,8 +215,7 @@ protected:
 	}
 
 
-	int udp_set_multicast_ttl(int sockfd, int mcastTTL,
-									 struct sockaddr *addr)
+	int udp_set_multicast_ttl(int sockfd, int mcastTTL, struct sockaddr *addr)
 	{
 		int rc = 0;
 
@@ -258,7 +256,7 @@ protected:
 
 			memcpy(&mreq6.ipv6mr_multiaddr, &(((struct sockaddr_in6 *)addr)->sin6_addr), sizeof(struct in6_addr));
 			mreq6.ipv6mr_interface= 0;
-			rc = setsockopt(sockfd, IPPROTO_IPV6, IPV6_ADD_MEMBERSHIP, &mreq6, sizeof(mreq6)) < 0);
+			rc = setsockopt(sockfd, IPPROTO_IPV6, IPV6_ADD_MEMBERSHIP, &mreq6, sizeof(mreq6));
 		}
 	#endif
 

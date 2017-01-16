@@ -23,8 +23,6 @@
 #include "platform/util/StdString.h"
 #include "client.h"
 
-#define DllImport   __declspec( dllimport )
-
 typedef std::vector<CStdString> CStdStringArray;
 
 namespace LibVLCCAPlugin 
@@ -34,11 +32,10 @@ class ILibVLCModule
 {
 public:
 	static ILibVLCModule* NewModule(const CStdString& cstrConfigPath, const CStdString& cstrCaUri, ULONG ulMCastIPAddr);
-	static void DeleteModule(ILibVLCModule* pmodule) { if(pmodule) delete pmodule; }
+	static void DeleteModule(ILibVLCModule* pmodule) { if (pmodule) delete pmodule; }
 
 	virtual ~ILibVLCModule() {}
 	virtual IStream* NewAccess(const CStdString& strMrl) = 0;
-	virtual CStdString GetBestMacAddress() = 0;
 };
 
 } //namespace LibVLCCAPlugin

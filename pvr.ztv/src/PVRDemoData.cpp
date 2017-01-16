@@ -23,7 +23,7 @@
 
 #include <algorithm>
 #include <functional>
-#include "tinyxml/tinyxml.h"
+#include "kodi/util/XMLUtils.h"
 #include "utils.h"
 #include "netstream.h"
 #include "LibVLCPlugin.h"
@@ -56,7 +56,7 @@ struct IpAddressOrderLess : public std::binary_function <PVRDemoChannel, PVRDemo
         const PVRDemoChannel& _Right
     ) const
 	{
-		return (_Left.ulIpNumber < _Right.ulIpNumber);
+		return (_Left.ulIpAndPortNumber < _Right.ulIpAndPortNumber);
 	}
 };
 
@@ -109,7 +109,6 @@ PVRDemoData::PVRDemoData(bool bIsEnableOnLineEpg, LPCSTR lpszMCastIf)
 
 PVRDemoData::~PVRDemoData(void)
 {
-  FreeVLC();
 }
 
 bool PVRDemoData::VLCInit(LPCSTR lpszCA)
@@ -497,7 +496,6 @@ bool PVRDemoData::LoadWebXmlChannels(const std::string& strMac)
 	  "<?xml version='1.0' encoding='utf-8'?>"\
 	  "<dxp.packet version='1.0' type='get_iptv_udev_data' label='%%label%%' hw_addr='%s' show_unavailable_channels='yes' />",
 	  strMac.c_str());
-	  //m_ptrVLCCAModule->GetBestMacAddress().c_str());
 
   if (HTTP_NOTFOUND == DoHttpRequest(strUrl, reqWebXml, respWebXml) || respWebXml.IsEmpty())
   {
@@ -545,7 +543,7 @@ bool PVRDemoData::LoadWebXmlChannels(const std::string& strMac)
 		  const TiXmlElement* pChannelElement = pChannelNode->ToElement();
 		  LPCSTR lpszTmp = NULL;
 		  CStdString strTmp;
-		  PVRDemoChannel channel = {false, 0, 0, 0, 0, false, 0, std::string(), std::string(), std::string()};
+		  PVRDemoChannel channel = {false, 0, 0, 0, 0, 0, false, 0, std::string(), std::string(), std::string()};
 
 		  /* channel name */
 		  if (lpszTmp = pChannelElement->Attribute("name"))
@@ -586,6 +584,10 @@ bool PVRDemoData::LoadWebXmlChannels(const std::string& strMac)
 				channel.iChannelNumber = iChannelNumber;
 			}
 		  }
+		  else
+		  {
+			  iChannelNumber = -1;
+		  }
 
 		  channel.ulIpNumber = INADDR_NONE;
 
@@ -593,9 +595,12 @@ bool PVRDemoData::LoadWebXmlChannels(const std::string& strMac)
 		  if (lpszTmp = pChannelElement->Attribute("source"))
 		  {
 			strTmp = lpszTmp;
+			CStdString strPort;
+
 			int ndx = strTmp.Find(':');
 			if(ndx > 0)
 			{
+				strPort = strTmp.Mid(ndx + 1);
 				strTmp = strTmp.Left(ndx);
 			}
 
@@ -624,6 +629,7 @@ bool PVRDemoData::LoadWebXmlChannels(const std::string& strMac)
 
 			channel.strStreamURL = strTmp;
 			channel.ulIpNumber = ulAddr;
+			channel.ulIpAndPortNumber = ntohl(ulAddr) + (atoi(strPort.c_str()) << 16);
 		  }
 		  else
 		  {
@@ -645,7 +651,14 @@ bool PVRDemoData::LoadWebXmlChannels(const std::string& strMac)
 			}
 		  }
 
-		  channel.iUniqueId = GetChannelId(channel.strStreamURL.c_str(), channel.ulIpNumber);
+		  if(iChannelNumber > 0)
+		  {
+			  channel.iUniqueId = iChannelNumber;
+		  }
+		  else
+		  {
+			  channel.iUniqueId = GetChannelId(channel.ulIpAndPortNumber);
+		  }
 
 		  //XBMC->Log(LOG_DEBUG, "%s - channel name: %s, id: %d, mrl: %s", __FUNCTION__, channel.strChannelName.c_str(), channel.iUniqueId, channel.strStreamURL.c_str());
 		  m_channels.push_back(channel);
@@ -718,7 +731,7 @@ bool PVRDemoData::LoadM3UList(const std::string& strM3uUri)
 	int iUniqueGroupId = 0;
 	int iCurrentGroupId = 0;
 
-	PVRDemoChannel channel = {false, 0, 0, 0, 0, false, 0, std::string(), std::string(), std::string()};
+	PVRDemoChannel channel = {false, 0, 0, 0, 0, 0, false, 0, std::string(), std::string(), std::string()};
 	CStdString strContent;
 	CStdString strChnlID;
     CStdString strLine;
@@ -851,14 +864,16 @@ bool PVRDemoData::LoadM3UList(const std::string& strM3uUri)
 				channel.bIsTcpTransport = true;
 			}
 
+			CStdString strPort;
 			CStdString strIp = strLine;
 			int ndx = strIp.ReverseFind(':');
-			if(ndx > 0 && strIp.Left(ndx).ReverseFind(':') > 0)//"1234" == strIp.Mid(ndx + 1))
+			if (ndx > 0 && strIp.Find('/', ndx) < 1)//"1234" == strIp.Mid(ndx + 1))
 			{
 				int ndxx = strIp.ReverseFind('/');
 
 				if(ndxx > 0 && ndx > ndxx)
 				{
+					strPort = strIp.Mid(ndx + 1);
 					strIp = strIp.Mid(ndxx + 1, ndx - ndxx - 1);
 
 					strIp.TrimLeft('@');
@@ -876,6 +891,10 @@ bool PVRDemoData::LoadM3UList(const std::string& strM3uUri)
 					}
 
 					channel.ulIpNumber = ulAddr;
+					if (ulAddr != INADDR_NONE)
+					{
+						channel.ulIpAndPortNumber = ntohl(ulAddr) + (atoi(strPort.c_str()) << 16);
+					}
 				}
 			}
 
@@ -904,9 +923,11 @@ bool PVRDemoData::LoadM3UList(const std::string& strM3uUri)
 				channel.strStreamURL	= strLine;
 			}
 
+			int iChannelNumber = -1;
+
 			if (!strChnlID.IsEmpty())
 			{
-				int iChannelNumber = atoi(strChnlID);
+				iChannelNumber = atoi(strChnlID);
 
 				if(iChannelNumber > 0)
 				{
@@ -914,12 +935,25 @@ bool PVRDemoData::LoadM3UList(const std::string& strM3uUri)
 				}
 			}
 
-			channel.iUniqueId = GetChannelId(channel.strStreamURL.c_str(), channel.ulIpNumber);
+			if(iChannelNumber > 0)
+			{
+				channel.iUniqueId = iChannelNumber;
+			}
+			else if (channel.ulIpAndPortNumber > 0)
+			{
+				int iUniqueId = GetChannelId(channel.strStreamURL.c_str());
+				iUniqueId = (iUniqueId % 0x400);
+				channel.iUniqueId = GetChannelId(channel.ulIpAndPortNumber) + (iUniqueId << 14);
+			}
+			else
+			{
+				channel.iUniqueId = GetChannelId(channel.strStreamURL.c_str());
 
-			IntZero iIndex = mapURIs[channel.strStreamURL];
-			mapURIs[channel.strStreamURL].iInt++;
+				IntZero iIndex = mapURIs[channel.strStreamURL];
+				mapURIs[channel.strStreamURL].iInt++;
 
-			channel.iUniqueId += iIndex.iInt;
+				channel.iUniqueId += iIndex.iInt;
+			}
 
 			if (iCurrentGroupId > 0) 
 			{
@@ -934,6 +968,7 @@ bool PVRDemoData::LoadM3UList(const std::string& strM3uUri)
 			channel.iEncryptionSystem = 0;
 			channel.bRadio = false;
 			channel.ulIpNumber = 0;
+			channel.ulIpAndPortNumber = 0;
 			channel.bIsTcpTransport = false;
 			channel.strChannelName.clear();
 			channel.strStreamURL.clear();
@@ -1118,7 +1153,7 @@ PVR_ERROR PVRDemoData::RequestWebEPGForChannel(ADDON_HANDLE handle, const PVRDem
 
 	if (xmlDoc.Error())
 	{
-		XBMC->Log(LOG_ERROR, "invalid epg data (no/invalid data responce found at 'epg.watch-tv.zet', xml: '%s')", respWebXml.c_str());
+		XBMC->Log(LOG_ERROR, "invalid epg data (no/invalid data responce found at 'epg.watch-tv.zet', xml: '%s')", respWebXml.Left(120).c_str());
 		return PVR_ERROR_FAILED;
 	}
 
@@ -1208,6 +1243,7 @@ PVR_ERROR PVRDemoData::RequestWebEPGForChannel(ADDON_HANDLE handle, const PVRDem
 			if (lpszTmp = pProgramElement->Attribute("description"))
 			{
 				entry.strPlot = lpszTmp;
+				entry.strPlotOutline = lpszTmp;
 				//XBMC->Log(LOG_DEBUG, "%s - description: %s", __FUNCTION__, lpszTmp);
 			}
 
@@ -1219,7 +1255,6 @@ PVR_ERROR PVRDemoData::RequestWebEPGForChannel(ADDON_HANDLE handle, const PVRDem
 			if (lpszTmp = pProgramElement->Attribute("picture"))
 			{
 				entry.strIconPath = lpszTmp;
-				entry.strPlotOutline = lpszTmp;
 				//XBMC->Log(LOG_DEBUG, "%s - icon path: %s", __FUNCTION__, lpszTmp);
 			}
 
@@ -1243,7 +1278,7 @@ PVR_ERROR PVRDemoData::RequestWebEPGForChannel(ADDON_HANDLE handle, const PVRDem
 			epg.push_back(entry);
 		}
 
-		int iAddBroadcastId = ((channel.iUniqueId >> 16) + channel.iUniqueId) << 20;
+		int iAddBroadcastId = (channel.iUniqueId % 0x400) << 12;
 
 		for (unsigned int iEntryPtr = 0; iEntryPtr < epg.size(); iEntryPtr++)
 		{
@@ -1468,27 +1503,23 @@ CStdString PVRDemoData::ReadMarkerValue(std::string &strLine, const char* strMar
 	return CStdString();
 }
 
-int PVRDemoData::GetChannelId(const char * strStreamUrl, unsigned int uiChannelId)
+int PVRDemoData::GetChannelId(const char * strStreamUrl)
 {
 	const char* strString = strStreamUrl;
-	SHORT wId = 0;
-	SHORT c;
+	unsigned long ulId = 0;
+	unsigned char c;
 
 	while (c = *strString++)
 	{
-		wId = (((wId << 5) + wId) + c); /* iId * 33 + c */
+		ulId = (ulId*101) + c;
 	}
 
-	if (0 == uiChannelId)
-	{
-		uiChannelId = 0x2;
-	}
-	else if(INADDR_NONE == uiChannelId)
-	{
-		uiChannelId = 0x3;
-	}
+	return (ulId % 0x100000);
+}
 
-	USHORT wChannelId = ((USHORT)(uiChannelId>>16) + (USHORT)uiChannelId);
+int PVRDemoData::GetChannelId(unsigned int uiChannelId)
+{
+	int iChannelId = (0xFFFF00 & (uiChannelId >> 8)) + (USHORT)uiChannelId;
 
-	return ((abs(wId) << 16)|(0x18000)|(int)wChannelId);
+	return iChannelId;
 }

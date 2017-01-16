@@ -21,18 +21,13 @@
  */
 
 #include "client.h"
-#include "xbmc_pvr_dll.h"
+#include "kodi/xbmc_pvr_dll.h"
+#include "kodi/libKODI_guilib.h"
 #include "PVRDemoData.h"
 #include "platform/util/util.h"
 
-#define TARGET_WINDOWS
-
 using namespace std;
 using namespace ADDON;
-
-#ifdef TARGET_WINDOWS
-#define snprintf _snprintf
-#endif
 
 enum EChannelsSource
 {
@@ -93,165 +88,7 @@ CHelper_libXBMC_pvr   *PVR            = NULL;
 
 extern "C" {
 
-void ADDON_ReadSettings(void)
-{
-  /* Read setting "host" from settings.xml */
-  char buffer[512];
-
-  if (!XBMC)
-    return;
-
-  /* Source settings */
-  /***********************/
-  if (!XBMC->GetSetting("chansort", &g_eChannelsSort))
-  { 
-    /* If setting is unknown fallback to defaults */
-    XBMC->Log(LOG_ERROR, "Couldn't get 'chansort' setting, falling back to 'unsorted' as default");
-	g_eChannelsSort = DEF_CHANNELS_SORT;
-  }
-
-  if (!XBMC->GetSetting("chansource", &g_eChannelsSource))
-  { 
-    /* If setting is unknown fallback to defaults */
-    XBMC->Log(LOG_ERROR, "Couldn't get 'chansource' setting, falling back to 'm3u' as default");
-	g_eChannelsSource = DEF_CHANNELS_SOURCE;
-  }
-
-  if(EChannelsSource::m3u == g_eChannelsSource)
-  {
-	  if (!XBMC->GetSetting("m3utype", &g_eChannelsType))
-	  { 
-		/* If setting is unknown fallback to defaults */
-		XBMC->Log(LOG_ERROR, "Couldn't get 'm3utype' setting, falling back to 'file' as default");
-		g_eChannelsType = DEF_CHANNELS_TYPE;
-	  }
-
-	  if(EM3uType::file == g_eChannelsType)
-	  {
-		  /* Read setting "filem3u" from settings.xml */
-		  if (XBMC->GetSetting("filem3u", &buffer))
-		  { 
-			g_strM3uText = buffer;
-		  }
-		  else
-		  {
-			/* If setting is unknown fallback to defaults */
-			XBMC->Log(LOG_ERROR, "Couldn't get 'filem3u' setting, falling back to 'iptv.m3u' as default");
-			g_strM3uText = DEF_M3U_TEXT;
-		  }
-	  }
-	  else
-	  {
-		  /* Read setting "urlm3u" from settings.xml */
-		  if (XBMC->GetSetting("urlm3u", &buffer))
-		  { 
-			g_strM3uText = buffer;
-		  }
-		  else
-		  {
-			/* If setting is unknown fallback to defaults */
-			XBMC->Log(LOG_ERROR, "Couldn't get 'urlm3u' setting, falling back to 'iptv.m3u' as default");
-			g_strM3uText = DEF_M3U_TEXT;
-		  }
-	  }
-  }
-  else
-  {
-	  /* Read setting "ca" from settings.xml */
-	  if (XBMC->GetSetting("mac", &buffer))
-	  { 
-		g_strMacText = buffer;
-	  }
-	  else
-	  {
-		/* If setting is unknown fallback to defaults */
-		XBMC->Log(LOG_ERROR, "Couldn't get 'mac' setting, falling back to '00:00:00:00:00:00' as default");
-		g_strMacText = DEF_MAC_TEXT;
-	  }
-  }
-
-  /* Read setting "proxyenable" from settings.xml */
-  if (!XBMC->GetSetting("proxyenable", &g_bEnableUDPProxy))
-  {
-    /* If setting is unknown fallback to defaults */
-    XBMC->Log(LOG_ERROR, "Couldn't get 'proxyenable' setting, falling back to 'false' as default");
-	g_bEnableUDPProxy = DEF_ENABLE_PROXY_UDP;
-  }
-
-  if(g_bEnableUDPProxy)
-  {
-	  /* Read setting "proxyipaddr" from settings.xml */
-	  if (XBMC->GetSetting("proxyipaddr", &buffer))
-	  {
-		g_strIpAddrProxy = buffer;
-	  }
-	  else
-	  {
-		/* If setting is unknown fallback to defaults */
-		XBMC->Log(LOG_ERROR, "Couldn't get 'proxyipaddr' setting, falling back to '127.0.0.1' as default");
-		g_strIpAddrProxy = DEF_IPADDR_PROXY;
-	  }
-
-	  /* Read setting "port" from settings.xml */
-	  if (!XBMC->GetSetting("proxyport", &g_iPortProxy))
-	  {
-		/* If setting is unknown fallback to defaults */
-		XBMC->Log(LOG_ERROR, "Couldn't get 'proxyport' setting, falling back to '7781' as default");
-		g_iPortProxy = DEF_PORT_PROXY;
-	  }
-  }
-
-  /* Read setting "groupenable" from settings.xml */
-  if (!XBMC->GetSetting("groupenable", &g_bEnableOnLineGroups))
-  {
-    /* If setting is unknown fallback to defaults */
-    XBMC->Log(LOG_ERROR, "Couldn't get 'groupenable' setting, falling back to 'true' as default");
-	g_bEnableOnLineGroups = DEF_ENABLE_ONLINE_GRP;
-  }
-
-  /* Read setting "epgenable" from settings.xml */
-  if (!XBMC->GetSetting("epgenable", &g_bEnableOnLineEpg))
-  {
-    /* If setting is unknown fallback to defaults */
-    XBMC->Log(LOG_ERROR, "Couldn't get 'epgenable' setting, falling back to 'true' as default");
-    g_bEnableOnLineEpg = DEF_ENABLE_ONLINE_EPG;
-  }
-
-  /* Read setting "caoffline" from settings.xml */
-  if (!XBMC->GetSetting("caenable", &g_bEnableSupportCa))
-  {
-    /* If setting is unknown fallback to defaults */
-    XBMC->Log(LOG_ERROR, "Couldn't get 'caenable' setting, falling back to 'false' as default");
-    g_bEnableSupportCa = DEF_ENABLE_SUPPORT_CA;
-  }
-
-  /* Read setting "ca" from settings.xml */
-  if (XBMC->GetSetting("ca", &buffer))
-  { 
-    g_strCaText = buffer;
-  }
-  else
-  {
-    /* If setting is unknown fallback to defaults */
-    XBMC->Log(LOG_ERROR, "Couldn't get 'ca' setting, falling back to '' as default");
-	g_strCaText = DEF_CA_TEXT;
-  }
-
-  /* Read setting "mcastif" from settings.xml */
-  if (XBMC->GetSetting("mcastif", &buffer))//&g_ulMCastIf))
-  {
-	g_strMCastIf = buffer;
-  }
-  else
-  {
-    /* If setting is unknown fallback to defaults */
-    XBMC->Log(LOG_ERROR, "Couldn't get 'mcastif' setting, falling back to '255.255.255.255' as default");
-    g_strMCastIf = DEF_MCASTIF;
-  }
-
-  /* Log the current settings for debugging purposes */
-  XBMC->Log(LOG_DEBUG, "settings: chansource='%u', epgenable=%u", g_eChannelsSource, g_bEnableOnLineEpg);
-}
+void ADDON_ReadSettings(void);
 
 ADDON_STATUS ADDON_Create(void* hdl, void* props)
 {
@@ -325,9 +162,175 @@ ADDON_STATUS ADDON_GetStatus()
 
 void ADDON_Destroy()
 {
+  if (m_bCaSupport)
+  {
+    m_data->FreeVLC();
+  }
+
   delete m_data;
   m_bCreated = false;
+
   m_CurStatus = ADDON_STATUS_UNKNOWN;
+}
+
+void ADDON_ReadSettings(void)
+{
+	/* Read setting "host" from settings.xml */
+	char buffer[512];
+
+	if (!XBMC)
+		return;
+
+	/* Source settings */
+	/***********************/
+	if (!XBMC->GetSetting("chansort", &g_eChannelsSort))
+	{
+		/* If setting is unknown fallback to defaults */
+		XBMC->Log(LOG_ERROR, "Couldn't get 'chansort' setting, falling back to 'unsorted' as default");
+		g_eChannelsSort = DEF_CHANNELS_SORT;
+	}
+
+	if (!XBMC->GetSetting("chansource", &g_eChannelsSource))
+	{
+		/* If setting is unknown fallback to defaults */
+		XBMC->Log(LOG_ERROR, "Couldn't get 'chansource' setting, falling back to 'm3u' as default");
+		g_eChannelsSource = DEF_CHANNELS_SOURCE;
+	}
+
+	if (EChannelsSource::m3u == g_eChannelsSource)
+	{
+		if (!XBMC->GetSetting("m3utype", &g_eChannelsType))
+		{
+			/* If setting is unknown fallback to defaults */
+			XBMC->Log(LOG_ERROR, "Couldn't get 'm3utype' setting, falling back to 'file' as default");
+			g_eChannelsType = DEF_CHANNELS_TYPE;
+		}
+
+		if (EM3uType::file == g_eChannelsType)
+		{
+			/* Read setting "filem3u" from settings.xml */
+			if (XBMC->GetSetting("filem3u", &buffer))
+			{
+				g_strM3uText = buffer;
+			}
+			else
+			{
+				/* If setting is unknown fallback to defaults */
+				XBMC->Log(LOG_ERROR, "Couldn't get 'filem3u' setting, falling back to 'iptv.m3u' as default");
+				g_strM3uText = DEF_M3U_TEXT;
+			}
+		}
+		else
+		{
+			/* Read setting "urlm3u" from settings.xml */
+			if (XBMC->GetSetting("urlm3u", &buffer))
+			{
+				g_strM3uText = buffer;
+			}
+			else
+			{
+				/* If setting is unknown fallback to defaults */
+				XBMC->Log(LOG_ERROR, "Couldn't get 'urlm3u' setting, falling back to 'iptv.m3u' as default");
+				g_strM3uText = DEF_M3U_TEXT;
+			}
+		}
+	}
+	else
+	{
+		/* Read setting "ca" from settings.xml */
+		if (XBMC->GetSetting("mac", &buffer))
+		{
+			g_strMacText = buffer;
+		}
+		else
+		{
+			/* If setting is unknown fallback to defaults */
+			XBMC->Log(LOG_ERROR, "Couldn't get 'mac' setting, falling back to '00:00:00:00:00:00' as default");
+			g_strMacText = DEF_MAC_TEXT;
+		}
+	}
+
+	/* Read setting "proxyenable" from settings.xml */
+	if (!XBMC->GetSetting("proxyenable", &g_bEnableUDPProxy))
+	{
+		/* If setting is unknown fallback to defaults */
+		XBMC->Log(LOG_ERROR, "Couldn't get 'proxyenable' setting, falling back to 'false' as default");
+		g_bEnableUDPProxy = DEF_ENABLE_PROXY_UDP;
+	}
+
+	if (g_bEnableUDPProxy)
+	{
+		/* Read setting "proxyipaddr" from settings.xml */
+		if (XBMC->GetSetting("proxyipaddr", &buffer))
+		{
+			g_strIpAddrProxy = buffer;
+		}
+		else
+		{
+			/* If setting is unknown fallback to defaults */
+			XBMC->Log(LOG_ERROR, "Couldn't get 'proxyipaddr' setting, falling back to '127.0.0.1' as default");
+			g_strIpAddrProxy = DEF_IPADDR_PROXY;
+		}
+
+		/* Read setting "port" from settings.xml */
+		if (!XBMC->GetSetting("proxyport", &g_iPortProxy))
+		{
+			/* If setting is unknown fallback to defaults */
+			XBMC->Log(LOG_ERROR, "Couldn't get 'proxyport' setting, falling back to '7781' as default");
+			g_iPortProxy = DEF_PORT_PROXY;
+		}
+	}
+
+	/* Read setting "groupenable" from settings.xml */
+	if (!XBMC->GetSetting("groupenable", &g_bEnableOnLineGroups))
+	{
+		/* If setting is unknown fallback to defaults */
+		XBMC->Log(LOG_ERROR, "Couldn't get 'groupenable' setting, falling back to 'true' as default");
+		g_bEnableOnLineGroups = DEF_ENABLE_ONLINE_GRP;
+	}
+
+	/* Read setting "epgenable" from settings.xml */
+	if (!XBMC->GetSetting("epgenable", &g_bEnableOnLineEpg))
+	{
+		/* If setting is unknown fallback to defaults */
+		XBMC->Log(LOG_ERROR, "Couldn't get 'epgenable' setting, falling back to 'true' as default");
+		g_bEnableOnLineEpg = DEF_ENABLE_ONLINE_EPG;
+	}
+
+	/* Read setting "caoffline" from settings.xml */
+	if (!XBMC->GetSetting("caenable", &g_bEnableSupportCa))
+	{
+		/* If setting is unknown fallback to defaults */
+		XBMC->Log(LOG_ERROR, "Couldn't get 'caenable' setting, falling back to 'false' as default");
+		g_bEnableSupportCa = DEF_ENABLE_SUPPORT_CA;
+	}
+
+	/* Read setting "ca" from settings.xml */
+	if (XBMC->GetSetting("ca", &buffer))
+	{
+		g_strCaText = buffer;
+	}
+	else
+	{
+		/* If setting is unknown fallback to defaults */
+		XBMC->Log(LOG_ERROR, "Couldn't get 'ca' setting, falling back to '' as default");
+		g_strCaText = DEF_CA_TEXT;
+	}
+
+	/* Read setting "mcastif" from settings.xml */
+	if (XBMC->GetSetting("mcastif", &buffer))//&g_ulMCastIf))
+	{
+		g_strMCastIf = buffer;
+	}
+	else
+	{
+		/* If setting is unknown fallback to defaults */
+		XBMC->Log(LOG_ERROR, "Couldn't get 'mcastif' setting, falling back to '255.255.255.255' as default");
+		g_strMCastIf = DEF_MCASTIF;
+	}
+
+	/* Log the current settings for debugging purposes */
+	XBMC->Log(LOG_DEBUG, "settings: chansource='%u', epgenable=%u", g_eChannelsSource, g_bEnableOnLineEpg);
 }
 
 bool ADDON_HasSettings()
@@ -426,10 +429,6 @@ ADDON_STATUS ADDON_SetSetting(const char *settingName, const void *settingValue)
 
 void ADDON_Stop()
 {
-  if(m_bCaSupport)
-  {
-		m_data->FreeVLC();
-  }
 }
 
 void ADDON_FreeSettings()
@@ -458,13 +457,13 @@ const char* GetMininumPVRAPIVersion(void)
 
 const char* GetGUIAPIVersion(void)
 {
-  static const char *strGuiApiVersion = XBMC_GUI_API_VERSION;
+  static const char *strGuiApiVersion = KODI_GUILIB_API_VERSION;
   return strGuiApiVersion;
 }
 
 const char* GetMininumGUIAPIVersion(void)
 {
-  static const char *strMinGuiApiVersion = XBMC_GUI_MIN_API_VERSION;
+  static const char *strMinGuiApiVersion = KODI_GUILIB_MIN_API_VERSION;
   return strMinGuiApiVersion;
 }
 
@@ -496,6 +495,11 @@ const char *GetConnectionString(void)
 {
   static CStdString strConnectionString = "connected";
   return strConnectionString.c_str();
+}
+
+const char *GetBackendHostname(void)
+{
+	return "localhost";
 }
 
 PVR_ERROR GetDriveSpace(long long *iTotal, long long *iUsed)
@@ -638,13 +642,16 @@ PVR_ERROR SignalStatus(PVR_SIGNAL_STATUS &signalStatus)
 }
 
 /** UNUSED API FUNCTIONS */
-int GetRecordingsAmount(void) { return -1; }
-PVR_ERROR GetRecordings(ADDON_HANDLE handle) { return PVR_ERROR_NOT_IMPLEMENTED; }
+PVR_ERROR OpenDialogChannelScan(void) { return PVR_ERROR_NOT_IMPLEMENTED; }
+int GetRecordingsAmount(bool deleted) { return -1; }
+PVR_ERROR GetRecordings(ADDON_HANDLE handle, bool deleted) { return PVR_ERROR_NOT_IMPLEMENTED; }
 PVR_ERROR DialogChannelScan(void) { return PVR_ERROR_NOT_IMPLEMENTED; }
 PVR_ERROR CallMenuHook(const PVR_MENUHOOK &menuhook, const PVR_MENUHOOK_DATA &item) { return PVR_ERROR_NOT_IMPLEMENTED; }
 PVR_ERROR DeleteChannel(const PVR_CHANNEL &channel) { return PVR_ERROR_NOT_IMPLEMENTED; }
 PVR_ERROR RenameChannel(const PVR_CHANNEL &channel) { return PVR_ERROR_NOT_IMPLEMENTED; }
 PVR_ERROR MoveChannel(const PVR_CHANNEL &channel) { return PVR_ERROR_NOT_IMPLEMENTED; }
+PVR_ERROR OpenDialogChannelSettings(const PVR_CHANNEL &channel) { return PVR_ERROR_NOT_IMPLEMENTED; }
+PVR_ERROR OpenDialogChannelAdd(const PVR_CHANNEL &channel) { return PVR_ERROR_NOT_IMPLEMENTED; }
 PVR_ERROR DialogChannelSettings(const PVR_CHANNEL &channel) { return PVR_ERROR_NOT_IMPLEMENTED; }
 PVR_ERROR DialogAddChannel(const PVR_CHANNEL &channel) { return PVR_ERROR_NOT_IMPLEMENTED; }
 bool OpenRecordedStream(const PVR_RECORDING &recording) { return false; }
@@ -677,4 +684,6 @@ void SetSpeed(int) {};
 time_t GetPlayingTime() { return 0; }
 time_t GetBufferTimeStart() { return 0; }
 time_t GetBufferTimeEnd() { return 0; }
+PVR_ERROR UndeleteRecording(const PVR_RECORDING& recording) { return PVR_ERROR_NOT_IMPLEMENTED; }
+PVR_ERROR DeleteAllRecordingsFromTrash() { return PVR_ERROR_NOT_IMPLEMENTED; }
 }

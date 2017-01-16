@@ -19,10 +19,6 @@
  *
  */
 
-#include <ws2tcpip.h>
-#include <Iphlpapi.h>
-#include <iostream>
-
 #include "comstream.h"
 #include "LibVLCPlugin.h"
 
@@ -87,20 +83,19 @@ class CLibVLCModule: public ILibVLCModule
 {
 public:
 	CLibVLCModule(const CStdString& cstrConfigPath, const CStdString& cstrCaUri, ULONG ulMCastIPAddr);
-    CLibVLCModule(const CStdString& cstrInitParamCAPlugin, const CStdStringArray& args)
+    CLibVLCModule(const CStdStringArray& args)
     {
-        LibVLCModuleInit(cstrInitParamCAPlugin, args, NULL, -1, 0);
+        LibVLCModuleInit(args, NULL, -1, 0);
     }
 
 	virtual ~CLibVLCModule()
 	{
-		LibVLCRelease();
+        LibVLCRelease();
 	}
 
 	void LibVLCRelease();
 
 	virtual IStream* NewAccess(const CStdString& strMrl);
-	virtual CStdString GetBestMacAddress();
 
 protected:
 private:
@@ -129,16 +124,13 @@ private:
 		PVOID         p_callback_list; // struct libvlc_callback_entry_list_t *p_callback_list;
 	};
 
-    static const CStdString _cstrCAPluginZetFileName;
     static const CStdString _cstrCALibVLCHookFileName;
 	static const CStdString _cstrLibVLCFileName;
 	static const CStdString _cstrLibVLCCoreFileName;
-    static const CStdString _cstrInitZetIpTvPlugin;
     static const CStdString _cLibVLCArgs[];
 
 	CStdString _strConfigPath;
 	CStdString _strCaHost;
-    HANDLE _hmodCAPluginZet;
     HANDLE _hmodCALibVLCHook;
 	HANDLE _hmodLibVLC;
 	HANDLE _hmodVLCCore;
@@ -156,9 +148,8 @@ private:
 		return _pLibVLCHandle->p_libvlc_int;
     }
 
-    void LibVLCModuleInit(const CStdString& cstrInitParamCAPlugin, const CStdStringArray& args, LPCSTR lpszCAMac, ULONG ulMCastIPAddr, int iCAPort);
+    void LibVLCModuleInit(const CStdStringArray& args, LPCSTR lpszCAMac, ULONG ulMCastIPAddr, int iCAPort);
 	bool CALibVLCHookLoad();
-	void CAPluginZetInit(const CStdString&  cstrInitParam);
 	void CALibVLCHookInit(LPCSTR lpszCAMac, ULONG ulMCastIPAddr, int iCAPort);
 	void LibVLCInit(const CStdStringArray& args);
 	void LibVLCCoreInit();
@@ -355,10 +346,6 @@ ILibVLCModule* ILibVLCModule::NewModule(const CStdString& cstrConfigPath, const 
 		in.s_addr=ulMCastIPAddr;
 
 		XBMC->Log(LOG_DEBUG, "Initialize vlc module: cfg path='%s', ca-uri='%s', mcast-ip='%s'", cstrConfigPath.c_str(), cstrCaUri.c_str(), inet_ntoa(in));
-		//XBMC->Log(LOG_DEBUG, "user cfg path='%s'", g_strUserPath.c_str());
-		//XBMC->Log(LOG_DEBUG, "Initialize vlc module");
-		//CStdString strMac = pmodule->GetBestMacAddress();
-		//XBMC->Log(LOG_DEBUG, "Best mac address: %s", strMac.c_str());
 	}
 	catch(const exception& excp)
 	{
@@ -368,17 +355,11 @@ ILibVLCModule* ILibVLCModule::NewModule(const CStdString& cstrConfigPath, const 
 	return pmodule;
 }
 
-const CStdString CLibVLCModule::_cstrCAPluginZetFileName = "IpTvPvr.Plugin.InterZet.dll";
 const CStdString CLibVLCModule::_cstrCALibVLCHookFileName = "LibVLCHook.dll";
 const CStdString CLibVLCModule::_cstrLibVLCFileName = "LibVlc.dll";
 const CStdString CLibVLCModule::_cstrLibVLCCoreFileName = "libvlccore.dll";
-const CStdString CLibVLCModule::_cstrInitZetIpTvPlugin = " frmPar=\"99999999\" ver=\"0.28.1.8823\""\
-    " cfUser=\"${CFG_PATH}IpTvPvr.User.ini\""\
-    " cfVlc=\"${CFG_PATH}IpTvPvr.Vlc.ini\""\
-    " cfProv=\"${CFG_PATH}Provider.ini\""\
-    " HttpCmdFunc=\"4301632\" ";
 const CStdString CLibVLCModule::_cLibVLCArgs[] = {
-                                    "--config=${CFG_PATH}.IpTvPvr.Vlc.ini",
+                                    //"--config=${CFG_PATH}.IpTvPvr.Vlc.ini",
                                     //"-vvv",
                                     "--plugin-path=${CFG_PATH}plugins",
 									"--ignore-config",
@@ -389,10 +370,8 @@ const CStdString CLibVLCModule::_cLibVLCArgs[] = {
 									"--miface-addr="
                                 };
 
-
 CLibVLCModule::CLibVLCModule(const CStdString& cstrConfigPath, const CStdString& cstrCaUri, ULONG ulMCastIPAddr)
 {
-    _hmodCAPluginZet = NULL;
     _hmodCALibVLCHook = NULL;
 	_hmodLibVLC = NULL;
 	_hmodVLCCore = NULL;
@@ -413,7 +392,7 @@ CLibVLCModule::CLibVLCModule(const CStdString& cstrConfigPath, const CStdString&
 	
 	arrLibVLCArgs.assign(_cLibVLCArgs, _cLibVLCArgs + _countof(_cLibVLCArgs));
 	arrLibVLCArgs.front().Replace("${CFG_PATH}", strConfigPath);
-	(arrLibVLCArgs.begin()+1)->Replace("${CFG_PATH}", strConfigPath);
+	//(arrLibVLCArgs.begin()+1)->Replace("${CFG_PATH}", strConfigPath);
 	if (~ulMCastIPAddr && ulMCastIPAddr)
 	{
 		in_addr in={0};
@@ -459,29 +438,30 @@ CLibVLCModule::CLibVLCModule(const CStdString& cstrConfigPath, const CStdString&
 		}
 		else
 		{
-			lpszCAMac = cstrCaUri.c_str();
-			_strCaHost = "watch-tv.zet";
-			arrLibVLCArgs.push_back("--ca-authuri=https://watch-tv.zet/ca/");
+			//lpszCAMac = cstrCaUri.c_str();
+			//_strCaHost = "watch-tv.zet";
+			//arrLibVLCArgs.push_back("--ca-authuri=https://watch-tv.zet/ca/");
+			SetLastError(ERROR_BAD_PATHNAME);
+			throw system_error(GetLastError(), system_category(), dlerror());
 		}
 	}
 	else
 	{
-		_strCaHost = "watch-tv.zet";
-		arrLibVLCArgs.push_back("--ca-authuri=https://watch-tv.zet/ca/");
+		//_strCaHost = "watch-tv.zet";
+		//arrLibVLCArgs.push_back("--ca-authuri=https://watch-tv.zet/ca/");
+		SetLastError(ERROR_BAD_ARGUMENTS);
+		throw system_error(GetLastError(), system_category(), dlerror());
 	}
 
-	CStdString strInitZetIpTvPlugin = _cstrInitZetIpTvPlugin;
-
-	strInitZetIpTvPlugin.Replace("${CFG_PATH}", strConfigPath);
-	LibVLCModuleInit(strInitZetIpTvPlugin, arrLibVLCArgs, lpszCAMac, ulMCastIPAddr, iCAPort);
+	LibVLCModuleInit(arrLibVLCArgs, lpszCAMac, ulMCastIPAddr, iCAPort);
 }
 
-void CLibVLCModule::LibVLCModuleInit(const CStdString& cstrInitParamCAPlugin, const CStdStringArray& args, LPCSTR lpszCAMac, ULONG ulMCastIPAddr, int iCAPort)
+void CLibVLCModule::LibVLCModuleInit(const CStdStringArray& args, LPCSTR lpszCAMac, ULONG ulMCastIPAddr, int iCAPort)
 {
     try
     {
         bool bSuccess = CALibVLCHookLoad();
-        CAPluginZetInit(cstrInitParamCAPlugin);
+
         if (bSuccess)
         {
             CALibVLCHookInit(lpszCAMac, ulMCastIPAddr, iCAPort);
@@ -503,13 +483,13 @@ void CLibVLCModule::LibVLCRelease()
 		delete _pLibAccess;
 		_pLibAccess = NULL;
 	}
-	//XBMC->Log(LOG_DEBUG, "libvlc_release(????");
+
     if (NULL != _pLibVLCHandle)
     {
-		//libvlc_release(_pLibVLCHandle);
+        //libvlc_release(_pLibVLCHandle);   // if uncomment this line, may crush with error while exit from kodi.
         _pLibVLCHandle = NULL;
     }
-	//XBMC->Log(LOG_DEBUG, "libvlc_release(!!!!!");
+
     if (NULL != _hmodVLCCore)
     {
         dlclose(_hmodVLCCore);
@@ -525,45 +505,7 @@ void CLibVLCModule::LibVLCRelease()
     if (NULL != _hmodCALibVLCHook)
     {
         dlclose(_hmodCALibVLCHook);
-        _hmodCAPluginZet = NULL;
-    }
-
-    if (NULL != _hmodCAPluginZet)
-    {
-        dlclose(_hmodCAPluginZet);
-        _hmodCAPluginZet = NULL;
-    }
-}
-
-
-void CLibVLCModule::CAPluginZetInit(const CStdString&  cstrInitParam)
-{
-	CStdString strCAPluginZetFilePath = _strConfigPath + _cstrCAPluginZetFileName;
-
-	if (XBMC->FileExists(strCAPluginZetFilePath, false))
-	{
-		//XBMC->Log(LOG_DEBUG, "%s - path: %s", __FUNCTION__, strCAPluginZetFilePath.c_str());
-		HANDLE hmodCAPluginZet = dlopen(strCAPluginZetFilePath, RTLD_LAZY);
-        if (NULL != hmodCAPluginZet)
-        {
-            PVOID funcaddr = dlsym(hmodCAPluginZet, "IpTvPlayerPluginInit");
-            if (0 != funcaddr)
-            {
-				//XBMC->Log(LOG_DEBUG, "%s - 0x%x", __FUNCTION__, funcaddr);
-				InvokePluginInitStr(funcaddr, cstrInitParam);
-                _hmodCAPluginZet = hmodCAPluginZet;
-            }
-            else
-            {
-				system_error err(GetLastError(), system_category(), dlerror());
-				dlclose(hmodCAPluginZet);
-				throw err;
-            }
-        }
-        else
-        {
-			throw system_error(GetLastError(), system_category(), dlerror());
-        }
+		_hmodCALibVLCHook = NULL;
     }
 }
 
@@ -578,10 +520,10 @@ bool CLibVLCModule::CALibVLCHookLoad()
 		if (NULL != hmodCALibVLCHook)
         {
 			PVOID funcaddr = dlsym(hmodCALibVLCHook, "_CAServerAddressInit@8");
-            if (0 != funcaddr)
-            {
-                funcaddr = dlsym(hmodCALibVLCHook, "_GetBestMacAddress@8");
-            }
+            //if (0 != funcaddr)
+            //{
+                //funcaddr = dlsym(hmodCALibVLCHook, "_GetBestMacAddress@8");
+            //}
 
             if (0 != funcaddr)
             {
@@ -613,8 +555,8 @@ void CLibVLCModule::CALibVLCHookInit(LPCSTR lpszCAMac, ULONG ulMCastIPAddr, int 
 
 		if (NULL != funcaddrInit)
         {
-			PVOID funcaddrGet = dlsym(_hmodCALibVLCHook, "_GetBestMacAddress@8");
-			if (NULL != funcaddrGet)
+			//PVOID funcaddrGet = dlsym(_hmodCALibVLCHook, "_GetBestMacAddress@8");
+			//if (NULL != funcaddrGet)
 			{
 				CStdString strMCastIPAddr;
 				LPCSTR szMCastIPAddr=NULL;
@@ -638,14 +580,14 @@ void CLibVLCModule::CALibVLCHookInit(LPCSTR lpszCAMac, ULONG ulMCastIPAddr, int 
 					SetLastError(status);
 					throw system_error(GetLastError(), system_category(), dlerror());
 				}
-				_GetBestMacAddress = reinterpret_cast<DWORD (WINAPI *)(PUCHAR uchPhysAddr, DWORD dwSize)>(funcaddrGet);
+				//_GetBestMacAddress = reinterpret_cast<DWORD (WINAPI *)(PUCHAR uchPhysAddr, DWORD dwSize)>(funcaddrGet);
 			}
-			else
-			{
+			//else
+			//{
 				//int iErrCode = Marshal.GetLastWin32Error();
 				//throw new Win32Exception(Marshal.GetLastWin32Error());
-				throw system_error(GetLastError(), system_category(), dlerror());
-			}
+				//throw system_error(GetLastError(), system_category(), dlerror());
+			//}
         }
         else
         {
@@ -657,7 +599,7 @@ void CLibVLCModule::CALibVLCHookInit(LPCSTR lpszCAMac, ULONG ulMCastIPAddr, int 
     else
     {
         //throw new Win32Exception((int)1157L);
-		SetLastError(1157L);
+		SetLastError(ERROR_DLL_NOT_FOUND);
 		throw system_error(GetLastError(), system_category(), dlerror());
     }
 }
@@ -717,7 +659,6 @@ void CLibVLCModule::LibVLCInit(const CStdStringArray& args)
     {
         //_instanceVLC = (libvlc_instance_t)Marshal.PtrToStructure(pLibVLC, typeof(libvlc_instance_t));
         _pLibVLCHandle = pLibVLC;
-        //Console.WriteLine("pLibVLC Done! - {0:X}", pLibVLC);
     }
 }
 
@@ -748,7 +689,7 @@ void CLibVLCModule::LibVLCCoreInit()
     }
 }
 
-
+#if 0
 CStdString CLibVLCModule::GetBestMacAddress()
 {
     CStdString strBestMac;
@@ -819,7 +760,7 @@ CStdString CLibVLCModule::GetBestMacAddress()
 
     return strBestMac;
 }
-
+#endif // 0
 IStream* CLibVLCModule::NewAccess(const CStdString& strMrl)
 {
 	return _pLibAccess->OpenMRL(strMrl);
@@ -850,13 +791,6 @@ friend class CLibVLCAccess;
             {
                 _udpSocket = *reinterpret_cast<SOCKET*>(pSysObject);
             }
-
-			//int nTimeout = 3000; // 3 seconds
-			//if (SOCKET_ERROR == setsockopt(_udpSocket, SOL_SOCKET, SO_RCVTIMEO, (const char*)&nTimeout, sizeof(int)))
-			//{
-				//throw system_error(static_cast<error_code::value_type>(WSAGetLastError()), system_category(), "Error setting socket SO_RCVTIMEO opts.");
-				//fprintf(stderr, "Error setting socket opts: %s\n", strerror(errno));
-			//}
 
 			fd_set fds;
 			struct timeval tv={0};
@@ -1089,69 +1023,5 @@ IStream* CLibVLCAccess::OpenMRL(string strMrl)
 
     return stream;
 }
-
-
-#if 0
-class CAUDPStreamBuf : public std::streambuf
-{
-public:
-	CAUDPStreamBuf()
-	{
-	}
-protected:
-	virtual int underflow() 
-	{
-		/*setg(buf, buf, buf+1); 
-		if (recv(*s, buf, 1, 0) != 1)
-			return EOF;
-		return buf[0];*/
-
-		return 0;
-	}
-
-private:
-};
-
-class CAUDPSTDStream: public std::istream
-{
-protected:
-	CAUDPStreamBuf _strBuf;
-	bool open;
-public:
-	CAUDPSTDStream(std::string address, int port): std::istream( &_strBuf )
-	{
-	}
-	bool isOpen()
-	{
-		return open;
-	}
-	void closeConnection()
-	{
-		//closesocket(s);
-	}
-};
-
-int main()
-{
-	using namespace std;
- 
-	WSADATA data;
-	WSAStartup(2,&amp;data);
-	//Create a custom ostream object with our own
-	//stream buffer
-	socketstream sock(&quot;213.67.169.210&quot;, 80);
-	if (!sock.isOpen())
-		return 1;
-	sock &lt;&lt; &quot;GET / HTTP/1.1\n\n&quot;;
-	std::string s;
-	while (!sock.eof())
-	{
-		getline( sock, s );
-		cout &lt;&lt; s;
-	}
-	cout &lt;&lt; &quot;\n\n\nConnection closed.&quot;;
-	cin.get();
-}
-#endif // 0
 
 } //namespace LibVLCCAPlugin

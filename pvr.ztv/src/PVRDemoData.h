@@ -66,6 +66,7 @@ struct PVRDemoChannel
   int                     iChannelNumber;
   int                     iGroupId;
   unsigned long           ulIpNumber;
+  unsigned long           ulIpAndPortNumber;
   bool                    bIsTcpTransport;
   int                     iEncryptionSystem;
   std::string             strChannelName;
@@ -128,7 +129,8 @@ protected:
   virtual bool LoadM3UList(const std::string& strM3uUri);
   int DoHttpRequest(const CStdString& resource, const CStdString& body, CStdString& response);
   CStdString PVRDemoData::ReadMarkerValue(std::string &strLine, const char* strMarkerName);
-  int GetChannelId(const char * strStreamUrl, unsigned int uiChannelId);
+  int GetChannelId(const char * strStreamUrl);
+  int GetChannelId(unsigned int uiChannelId);
 private:
   static const char* ZTV_CASERVER_URI;
   static const char* ZTV_EPGSERVER_URI;

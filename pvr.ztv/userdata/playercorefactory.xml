@@ -1,0 +1,21 @@
+<playercorefactory>
+ <players>
+   <player name="MPC-HC" type="ExternalPlayer" audio="false" video="true">
+     <filename>C:\Program Files\MPC-HC\mpc-hc.exe</filename>
+     <args>"{1}" /fullscreen /close</args>
+     <hidexbmc>false</hidexbmc>
+     <hideconsole>false</hideconsole>
+     <warpcursor>none</warpcursor>
+   </player>
+   <player name="PVR-MPC" type="ExternalPlayer" audio="false" video="true">
+      <filename>C:\Users\Viktor\AppData\Roaming\Kodi\userdata\pvrmpc.cmd</filename>
+      <args>"{1}"</args>
+      <hideconsole>true</hideconsole>
+   </player>
+ </players>
+ <rules action="prepend">
+    <rule filetypes="pvr" filename=".*/tv/.*/pvr.ztv_12[5-9].+" player="PVR-MPC" />
+    <rule filetypes="pvr" filename=".*/tv/.*/pvr.ztv_1[3-9]\d.+" player="PVR-MPC" />
+    <rule filetypes="pvr" filename=".*/tv/.*/pvr.ztv_11\D.+" player="PVR-MPC" />
+ </rules>
+</playercorefactory>

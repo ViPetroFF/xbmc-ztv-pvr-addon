@@ -25,6 +25,6 @@
   	<setting id="mcastif" type="ipaddress" label="30004" default="255.255.255.255"/>
 	<setting id="epgenable" type="bool" label="30003" default="true"/>
 	<setting id="caenable" type="bool" label="30005" default="false"/>
-    <setting id="ca" type="text" label="30006" default="" option="hidden"/>
+    <setting id="ca" type="text" label="30006" default="http://127.0.0.1:7781/ca/" visible="eq(-1,true)" enable="eq(-1,true)"/>
   </category>  
 </settings>

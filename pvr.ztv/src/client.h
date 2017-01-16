@@ -22,9 +22,8 @@
  *
  */
 
-#include "libXBMC_addon.h"
-#include "libXBMC_pvr.h"
-#include "libXBMC_gui.h"
+#include "kodi/libXBMC_addon.h"
+#include "kodi/libXBMC_pvr.h"
 
 extern bool                          m_bCreated;
 extern std::string                   g_strUserPath;
