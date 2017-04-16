@@ -139,7 +139,7 @@ friend class INetStreamFactory;
 		//addr.sin_addr.s_addr = htonl(INADDR_ANY);
 		addr.sin_addr.s_addr = _ulMCastIf;
 
-		if (bind_ret < 0) //&& ::bind(_sd, (struct sockaddr *)&addr, len) < 0)
+		if (bind_ret < 0) && ::bind(_sd, (struct sockaddr *)&addr, len) < 0)
 		{
 			closesocket(_sd);
 			ThrowException("bind");
