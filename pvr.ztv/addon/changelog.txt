@@ -1,3 +1,10 @@
+v2.1.1
+- Fixed: timeshift support for http streams
+- Added: switch kodi or ztv to handles input stream
+- Added new logos for channels
+- Updated to PVR addon API v5.2.0
+- Initial Kodi Krypton version.
+
 v1.10.1
 - Added new logos for channels
 - Miscellaneous fixes

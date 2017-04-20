@@ -20,7 +20,7 @@
  */
 #pragma once
 
-#include "platform/util/StdString.h"
+#include "p8-platform/util/StdString.h"
 #include "client.h"
 
 typedef std::vector<CStdString> CStdStringArray;

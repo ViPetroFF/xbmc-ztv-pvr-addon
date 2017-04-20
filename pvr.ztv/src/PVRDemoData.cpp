@@ -1,5 +1,5 @@
 /*
- *      Copyright (C) 2014 Viktor PetroFF
+ *      Copyright (C) 2017 Viktor PetroFF
  *      Copyright (C) 2011 Pulse-Eight
  *      http://www.pulse-eight.com/
  *
@@ -23,12 +23,13 @@
 
 #include <algorithm>
 #include <functional>
-#include "kodi/util/XMLUtils.h"
-#include "utils.h"
+#include <unordered_map>
+#include "util/XMLUtils.h"
+#include "utf8.h"
+#include "Base64.h"
 #include "netstream.h"
 #include "LibVLCPlugin.h"
 #include "PVRDemoData.h"
-
 
 using namespace std;
 using namespace ADDON;
@@ -42,8 +43,12 @@ struct AlphabeticalOrderLess : public std::binary_function <PVRDemoChannel, PVRD
         const PVRDemoChannel& _Right
     ) const
 	{
-		CStdStringW strLeftNameW = UTF8Util::ConvertUTF8ToUTF16(_Left.strChannelName.c_str()).Trim();
-		CStdStringW strRightNameW = UTF8Util::ConvertUTF8ToUTF16(_Right.strChannelName.c_str()).Trim();
+		CStdStringW strLeftNameW;
+		utf8::utf8to16(_Left.strChannelName.cbegin(), _Left.strChannelName.cend(), back_inserter(strLeftNameW));
+		CStdStringW strRightNameW;
+		utf8::utf8to16(_Right.strChannelName.cbegin(), _Right.strChannelName.cend(), back_inserter(strRightNameW));
+		strLeftNameW.Trim();
+		strRightNameW.Trim();
 
 		return (strLeftNameW.CompareNoCase(strRightNameW) < 0);
 	}
@@ -71,40 +76,80 @@ struct URLOrderLess : public std::binary_function <PVRDemoChannel, PVRDemoChanne
 	}
 };
 
+time_t DateTimeToTimeT(const std::string& datetime)
+{
+	struct tm timeinfo;
+	int year, month, day;
+	int hour, minute, second;
+	int count;
+	time_t retval;
+
+	count = sscanf(datetime.c_str(), "%4d-%2d-%2d %2d:%2d:%2d", &year, &month, &day, &hour, &minute, &second);
+
+	if (count != 6)
+		return -1;
+
+	timeinfo.tm_hour = hour;
+	timeinfo.tm_min = minute;
+	timeinfo.tm_sec = second;
+	timeinfo.tm_year = year - 1900;
+	timeinfo.tm_mon = month - 1;
+	timeinfo.tm_mday = day;
+	// Make the other fields empty:
+	timeinfo.tm_isdst = -1;
+	timeinfo.tm_wday = 0;
+	timeinfo.tm_yday = 0;
+
+	retval = mktime(&timeinfo);
+
+	if (retval < 0)
+		retval = 0;
+
+	return retval;
+}
+
 const int HTTP_OK = 200;
 const int HTTP_NOTFOUND = 404;
 
+const char* PVRDemoData::ZTV_CASERVER_HOSTNAME = "new.watch-tv.zet";
 const char* PVRDemoData::ZTV_CASERVER_URI  = "https://ares:FXa0skl4d@new.watch-tv.zet/";
-const char* PVRDemoData::ZTV_EPGSERVER_URI = "http://ares:FXa0skl4d@epg.watch-tv.zet/";
+const char* PVRDemoData::ZTV_EPGSERVER_URI = "http://ares:FXa0skl4d@epg.watch-tv.zet/";// index.htm";
 
-PVRDemoData::PVRDemoData(bool bIsEnableOnLineEpg, LPCSTR lpszMCastIf)
+PVRDemoData::PVRDemoData(EInputStreamHandler handler, bool bIsEnableOnLineEpg, LPCSTR lpszMCastIf)
 {
-  m_iEpgStart = -1;
-  m_strDefaultIcon = GetIconPath("515");
-  m_ptrVLCCAModule = NULL;
-  m_currentStream = NULL;
-  m_currentChannel.iUniqueId = 0;
-  m_ulMCastIf = INADDR_NONE;
-  m_bIsEnableOnLineEpg = bIsEnableOnLineEpg;
-  m_bCaSupport = false;
+	m_timeSpeedLastChanged = 0;
+	m_iPauseDuration = 0;
+	m_LastSpeed = 0;
+	m_LastSpeedDownload = 0;
+	m_llLastStreamPos = 0;
+	m_llStreamCurrentLength = 0;
 
-  if(lpszMCastIf && '\0' != *lpszMCastIf && strcmp("255.255.255.255", lpszMCastIf))
-  {
-    m_ulMCastIf = inet_addr(lpszMCastIf);
+	m_strDefaultIcon = GetIconPath("515");
+	m_ptrVLCCAModule = NULL;
+	m_currentStream = NULL;
+	m_currentChannel.iUniqueId = 0;
+	m_StreamHandler = handler;
+	m_ulMCastIf = INADDR_NONE;
+	m_bIsEnableOnLineEpg = bIsEnableOnLineEpg;
+	m_bCaSupport = false;
 
-	if (m_ulMCastIf == INADDR_NONE)
+	if(lpszMCastIf && '\0' != *lpszMCastIf && strcmp("255.255.255.255", lpszMCastIf))
 	{
-		XBMC->Log(LOG_ERROR, "inet_addr failed and returned INADDR_NONE");
-	}   
+		m_ulMCastIf = inet_addr(lpszMCastIf);
+
+		if (m_ulMCastIf == INADDR_NONE)
+		{
+			XBMC->Log(LOG_ERROR, "inet_addr failed and returned INADDR_NONE");
+		}   
     
-	if (m_ulMCastIf == INADDR_ANY)
-	{
-		XBMC->Log(LOG_ERROR, "inet_addr failed and returned INADDR_ANY");
-		m_ulMCastIf = INADDR_NONE;
+		if (m_ulMCastIf == INADDR_ANY)
+		{
+			XBMC->Log(LOG_ERROR, "inet_addr failed and returned INADDR_ANY");
+			m_ulMCastIf = INADDR_NONE;
+		}
 	}
-  }
 
-  LibNetStream::INetStreamFactory::SetMCastIf(m_ulMCastIf);
+	LibNetStream::INetStreamFactory::SetMCastIf(m_ulMCastIf);
 }
 
 PVRDemoData::~PVRDemoData(void)
@@ -136,7 +181,7 @@ void PVRDemoData::FreeVLC(void)
 	}
 }
 
-void PVRDemoData::ProxyAddrInit(LPCSTR lpszIP, int iPort, bool bCaSupport)
+string PVRDemoData::ProxyAddrInit(LPCSTR lpszIP, int iPort, bool bCaSupport)
 {
 	m_bCaSupport = bCaSupport;
 
@@ -148,6 +193,8 @@ void PVRDemoData::ProxyAddrInit(LPCSTR lpszIP, int iPort, bool bCaSupport)
 	{
 		m_strProxyAddr.Format("%s:%d", lpszIP, iPort);
 	}
+
+	return m_strProxyAddr;
 }
 
 bool PVRDemoData::LoadChannelsData(const std::string& strM3uPath, bool bIsOnLineSource, bool bIsEnableOnLineGroups, EChannelsSort sortby)
@@ -206,7 +253,8 @@ bool PVRDemoData::LoadChannelsData(const std::string& strM3uPath, bool bIsOnLine
 
 				if(!name.IsEmpty() && iId > 0)
 				{
-					CStdStringW nameW = UTF8Util::ConvertUTF8ToUTF16(name.c_str());
+					CStdStringW nameW;
+					utf8::utf8to16(name.cbegin(), name.cend(), back_inserter(nameW));
 					m_mapLogo.insert(StrIntPair(nameW.ToLower(), iId));
 				}
 			}
@@ -332,7 +380,8 @@ std::string PVRDemoData::GetIconPath(LPCSTR lpszIcoFName) const
 
 		if (!XBMC->FileExists(iconFile.c_str(), false))
 		{
-			CStdStringW strNameW = UTF8Util::ConvertUTF8ToUTF16(iconName.c_str());
+			CStdStringW strNameW;
+			utf8::utf8to16(iconName.cbegin(), iconName.cend(), back_inserter(strNameW));
 			std::map<std::wstring, int>::const_iterator pos = m_mapLogo.find(strNameW.Trim().ToLower());
 			if(m_mapLogo.end() != pos && pos->second > 0)
 			{
@@ -724,7 +773,7 @@ bool PVRDemoData::LoadM3UList(const std::string& strM3uUri)
 		return false;
 	}
 
-	stdext::hash_map<std::string, IntZero> mapURIs;
+	std::unordered_map<std::string, IntZero> mapURIs;
 	/* load channels */
 	bool isfirst = true;
 
@@ -743,6 +792,7 @@ bool PVRDemoData::LoadM3UList(const std::string& strM3uUri)
 	}
 
 	std::stringstream stream(strContent);
+
 	//while(XBMC->ReadFileString(hFile, strLine.SetBuf(512), 512))
 	while(stream.getline(strLine.SetBuf(512), 512)) 
 	{
@@ -935,11 +985,14 @@ bool PVRDemoData::LoadM3UList(const std::string& strM3uUri)
 				}
 			}
 
+#if 1
 			if(iChannelNumber > 0)
 			{
 				channel.iUniqueId = iChannelNumber;
 			}
-			else if (channel.ulIpAndPortNumber > 0)
+			else
+#endif // id number
+			if (channel.ulIpAndPortNumber > 0)
 			{
 				int iUniqueId = GetChannelId(channel.strStreamURL.c_str());
 				iUniqueId = (iUniqueId % 0x400);
@@ -1008,15 +1061,28 @@ PVR_ERROR PVRDemoData::GetChannels(ADDON_HANDLE handle, bool bRadio)
       xbmcChannel.iUniqueId         = channel.iUniqueId;
       xbmcChannel.bIsRadio          = channel.bRadio;
       xbmcChannel.iChannelNumber    = channel.iChannelNumber;
-      strncpy(xbmcChannel.strChannelName, channel.strChannelName.c_str(), sizeof(xbmcChannel.strChannelName) - 1);
-	  //strncpy(xbmcChannel.strStreamURL, channel.strStreamURL.c_str(), sizeof(xbmcChannel.strStreamURL) - 1);
-	  xbmcChannel.iEncryptionSystem = channel.bIsTcpTransport?0:channel.iEncryptionSystem;
-	  //PVR_STRCPY(xbmcChannel.strInputFormat, "video/x-mpegts");
-	  if(!channel.bRadio)
+	  strncpy(xbmcChannel.strChannelName, channel.strChannelName.c_str(), sizeof(xbmcChannel.strChannelName) - 1);
+	  xbmcChannel.iEncryptionSystem = channel.iEncryptionSystem;
+
+	  if (EInputStreamHandler::kodi == m_StreamHandler)
 	  {
-        PVR_STRCPY(xbmcChannel.strInputFormat, "video/mp2t");
+		  CStdString strStream;
+		  strStream.Format((channel.bRadio)?"pvr://stream/radio/%i.ts": "pvr://stream/tv/%i.ts", channel.iUniqueId);
+		  strncpy(xbmcChannel.strStreamURL, strStream.c_str(), sizeof(xbmcChannel.strStreamURL) - 1);
 	  }
-      strncpy(xbmcChannel.strIconPath, channel.strIconPath.c_str(), sizeof(xbmcChannel.strIconPath) - 1);
+	  else
+	  {
+		  if (channel.bRadio)
+		  {
+			  strncpy(xbmcChannel.strStreamURL, channel.strStreamURL.c_str(), sizeof(xbmcChannel.strStreamURL) - 1);
+		  }
+		  else
+		  {
+			  //strcpy(xbmcChannel.strInputFormat, "video/x-mpegts");
+			  strcpy(xbmcChannel.strInputFormat, "video/mp2t");
+		  }
+	  }
+	  strncpy(xbmcChannel.strIconPath, channel.strIconPath.c_str(), sizeof(xbmcChannel.strIconPath) - 1);
       xbmcChannel.bIsHidden         = false;
 
       PVR->TransferChannelEntry(handle, &xbmcChannel);
@@ -1062,7 +1128,7 @@ PVR_ERROR PVRDemoData::GetChannelGroups(ADDON_HANDLE handle, bool bRadio)
       memset(&xbmcGroup, 0, sizeof(PVR_CHANNEL_GROUP));
 
       xbmcGroup.bIsRadio = bRadio;
-      strncpy(xbmcGroup.strGroupName, group.strGroupName.c_str(), sizeof(xbmcGroup.strGroupName) - 1);
+	  strncpy(xbmcGroup.strGroupName, group.strGroupName.c_str(), sizeof(xbmcGroup.strGroupName) - 1);
 
       PVR->TransferChannelGroup(handle, &xbmcGroup);
     }
@@ -1102,17 +1168,11 @@ PVR_ERROR PVRDemoData::GetChannelGroupMembers(ADDON_HANDLE handle, const PVR_CHA
 
 PVR_ERROR PVRDemoData::GetEPGForChannel(ADDON_HANDLE handle, const PVR_CHANNEL &channel, time_t iStart, time_t iEnd)
 {
-	if (m_iEpgStart == -1)
-	{
-		m_iEpgStart = iStart;
-	}
-
 	PVR_ERROR result = PVR_ERROR_NO_ERROR;
-	time_t iLastEndTime = m_iEpgStart + 1;
 
 	PVRDemoChannel& myChannel = m_channels.at(channel.iChannelNumber -1);
 
-	if (m_bIsEnableOnLineEpg && iLastEndTime < iEnd)
+	if (m_bIsEnableOnLineEpg)
 	{
 		result = RequestWebEPGForChannel(handle, myChannel, iStart, iEnd);
 	}
@@ -1140,7 +1200,7 @@ PVR_ERROR PVRDemoData::RequestWebEPGForChannel(ADDON_HANDLE handle, const PVRDem
 	CStdString respWebXml;
 
 	reqWebXml.Format( "<?xml version='1.0' encoding='utf-8'?>"\
-		"<dxp.packet version='1.0' type='get_epg' channel_name='zetc://@%s:1234' />", strIPAddr.c_str());//'zetc://@235.10.10.7:1234' />"
+		"<dxp.packet version='1.0' type='get_epg' channel_name='zetc://@%s:1234'/>", strIPAddr.c_str());//'zetc://@235.10.10.7:1234' />"
 
 	if (HTTP_NOTFOUND == DoHttpRequest(strUrl, reqWebXml, respWebXml) || respWebXml.IsEmpty())
 	{
@@ -1326,6 +1386,16 @@ bool PVRDemoData::OpenLiveStream(const PVR_CHANNEL &channelinfo)
 		}
 
 		bSuccess = (NULL != m_currentStream);
+
+		if(bSuccess && m_currentChannel.bIsTcpTransport)
+		{
+			m_timeSpeedLastChanged = time(NULL);
+			m_iPauseDuration = 0;
+			m_LastSpeed = 0;
+			m_LastSpeedDownload = 0;
+			m_llLastStreamPos = 0;
+			m_llStreamCurrentLength = 0;
+		}
     }
 
 	return bSuccess;
@@ -1372,6 +1442,7 @@ int PVRDemoData::ReadLiveStream(unsigned char *pBuffer, unsigned int iBufferSize
 		HRESULT hr = m_currentStream->Read(pBuffer, static_cast<ULONG>(iBufferSize), &ulRead);
 		if(SUCCEEDED(hr))
 		{
+			m_llStreamCurrentLength += ulRead;
 			iRead = static_cast<int>(ulRead);
 		}
 	}
@@ -1386,7 +1457,17 @@ int PVRDemoData::GetCurrentClientChannel()
 
 const char * PVRDemoData::GetLiveStreamURL(const PVR_CHANNEL &channel)
 {
-	return m_currentChannel.strStreamURL.c_str();
+	bool bSuccess = false;
+
+	if (GetChannel(channel, m_currentChannel))
+	{
+		XBMC->Log(LOG_DEBUG, "GetLiveStreamURL(%d:%s) (oid=%d)",
+			m_currentChannel.iChannelNumber, m_currentChannel.strChannelName.c_str(), m_currentChannel.iUniqueId);
+
+		bSuccess = true;
+	}
+
+	return (bSuccess)?m_currentChannel.strStreamURL.c_str():"";
 }
 
 bool PVRDemoData::CanPauseStream()
@@ -1397,19 +1478,131 @@ bool PVRDemoData::CanPauseStream()
 void PVRDemoData::PauseStream(bool bPaused)
 {
 	XBMC->Log(LOG_DEBUG, "%s - bPaused = %u", __FUNCTION__, bPaused);
+	//return;
+	if (EInputStreamHandler::ztv == m_StreamHandler)
+	{
+		time_t now = time(NULL);
+		double diff = difftime(now, m_timeSpeedLastChanged);
+		int64_t m_llStreamDiff = (m_llStreamCurrentLength - m_llLastStreamPos);
+
+		if (m_llLastStreamPos < 0)
+		{
+			m_iPauseDuration += diff;
+			m_LastSpeed = 0;
+		}
+		else if (diff > 2)
+		{
+			double SpeedDownload = m_llStreamDiff / diff;
+
+			if (0 == m_LastSpeed)
+			{
+				m_StreamSpeed.AddValue(m_llStreamDiff, diff);
+				m_LastSpeed = 1;
+			}
+			else
+			{
+				double SpeedStream = m_StreamSpeed.GetAverage();
+				SpeedStream = SpeedDownload / SpeedStream;
+				diff *= (SpeedStream - 1);
+				m_iPauseDuration -= diff;
+
+				if (m_iPauseDuration < 4)
+				{
+					m_iPauseDuration = 0;
+				}
+
+				m_LastSpeed = SpeedStream;
+			}
+
+			//XBMC->Log(LOG_DEBUG, "%s - SpeedDownload = %f, Last: %f", __FUNCTION__, SpeedDownload, m_LastSpeedDownload);
+			m_LastSpeedDownload = SpeedDownload;
+			//XBMC->Log(LOG_DEBUG, "%s - LastSpeed = %f", __FUNCTION__, m_LastSpeed);
+		}
+
+		if (bPaused)
+		{
+			m_llLastStreamPos = -1;
+		}
+		else
+		{
+			m_llLastStreamPos = m_llStreamCurrentLength;
+		}
+		m_timeSpeedLastChanged = now;
+		///XBMC->Log(LOG_DEBUG, "%s - m_iPauseDuration = %d", __FUNCTION__, m_iPauseDuration);
+	}
 }
+
 
 bool PVRDemoData::CanSeekStream()
 {
 	return CanPauseStream();
 }
 
+bool PVRDemoData::IsTimeshifting()
+{
+	return (m_iPauseDuration > 8);
+}
+
+time_t PVRDemoData::GetPlayingTime()
+{
+	bool bIsPause = (m_llLastStreamPos < 0);
+	int iPause = m_iPauseDuration;
+	time_t speed = m_timeSpeedLastChanged;
+	time_t now = (bIsPause) ? speed : time(NULL);
+
+	if (!bIsPause && m_LastSpeed > 0)
+	{
+		double  SpeedStream = 1.0f;
+		double diff = difftime(now, speed);
+
+		if (diff > 0)
+		{
+			double speeddownl = (m_llStreamCurrentLength - m_llLastStreamPos) / diff;
+			double StreamSpeedDownload = m_StreamSpeed.GetAverage();
+
+			if (StreamSpeedDownload > 0)
+			{
+				SpeedStream = speeddownl / StreamSpeedDownload;
+			}
+		}
+
+		if (SpeedStream > 1.0f)
+		{
+			int ahead = diff*(SpeedStream - 1.0f);
+			if (ahead < iPause)
+			{
+				now += ahead;
+			}
+			else
+			{
+				now += iPause;
+			}
+		}
+	}
+
+	return (now - iPause);
+}
+
+time_t PVRDemoData::GetBufferTimeStart()
+{
+	return (GetPlayingTime() - 1);
+}
+
+time_t PVRDemoData::GetBufferTimeEnd()
+{
+	return time(NULL);
+}
+
+bool PVRDemoData::IsRealTimeStream()
+{
+	return true;
+}
 
 /************************************************************/
 /** http handling */
 int PVRDemoData::DoHttpRequest(const CStdString& resource, const CStdString& body, CStdString& response)
 {
-	PLATFORM::CLockObject lock(m_mutex);
+	//PLATFORM::CLockObject lock(m_mutex);
 
 	// ask XBMC to read the URL for us
 	int resultCode = HTTP_NOTFOUND;
@@ -1423,52 +1616,60 @@ int PVRDemoData::DoHttpRequest(const CStdString& resource, const CStdString& bod
 
 	if(!request.IsEmpty())
 	{
-		CStdString label;
-		label.Format("%.4d%.2d%.2d%.2d%.2d%.2d", newtime->tm_year+1900, newtime->tm_mon+1, newtime->tm_mday, newtime->tm_hour, newtime->tm_min, newtime->tm_sec);
-
-		request.Replace("%label%", label);
-	}
-
-	XBMC->Log(LOG_DEBUG, "%s - request: %s", __FUNCTION__, request.c_str());
-	void* hFile = XBMC->OpenFileForWrite(url.c_str(), 0);
-	if (hFile != NULL)
-	{
-		int rc = XBMC->WriteFile(hFile, request.c_str(), request.length());
-		if (rc >= 0)
+		int ndx = request.Find("zetc:");
+		if (ndx > 0)
 		{
-			CStdString result;
-			CStdString buffer;
-
-			//int iLen = 0;
-			//while (iLen = XBMC->ReadFile(hFile, buffer.SetBuf(256), 256))
-			while (XBMC->ReadFileString(hFile, buffer.SetBuf(256), 256))
+			ndx = request.Find(':', ndx + 5);
+			int ndxx = (ndx > 0)?request.ReverseFind(".", ndx):ndx;
+			ndx -= ndxx;
+			if (ndxx > 0 && ndx > 1 && ndx < 3)
 			{
-				buffer.RelBuf();
-				result += buffer;
+				request.Replace("/>", " />");
 			}
-
-			response = result;
-			if(response.length() < 200)
-			{
-				XBMC->Log(LOG_DEBUG, "%s - response: %s", __FUNCTION__, response.c_str());
-			}
-			else
-			{
-				//XBMC->Log(LOG_DEBUG, "%s - response: %s", __FUNCTION__, response.Left(800).c_str());
-			}
-
-			resultCode = HTTP_OK;
 		}
 		else
 		{
-			XBMC->Log(LOG_ERROR, "can not write to %s", url.c_str());
+			CStdString label;
+			label.Format("%.4d%.2d%.2d%.2d%.2d%.2d", newtime->tm_year + 1900, newtime->tm_mon + 1, newtime->tm_mday, newtime->tm_hour, newtime->tm_min, newtime->tm_sec);
+			request.Replace("%label%", label);
+		}
+		url += "|Content-Type=text/xml; charset=\"utf-8\"";
+		url += "&postdata=" + Base64::Encode(request);
+		//XBMC->Log(LOG_DEBUG, "%s - url: %s", __FUNCTION__, url.c_str());
+	}
+
+	XBMC->Log(LOG_DEBUG, "%s - request: %s", __FUNCTION__, request.c_str());
+
+	void* hFile = XBMC->OpenFile(url.c_str(), 0);
+	if (hFile != NULL)
+	{
+		CStdString result;
+		CStdString buffer;
+
+		//XBMC->Log(LOG_DEBUG, "%s - hFile != NULL", __FUNCTION__);
+
+		while (XBMC->ReadFileString(hFile, buffer.SetBuf(512), 512))
+		{
+			buffer.RelBuf();
+			result += buffer;
 		}
 
+		response = result;
+		if(response.length() < 200)
+		{
+			XBMC->Log(LOG_DEBUG, "%s - response: %s", __FUNCTION__, response.c_str());
+		}
+		//else
+		//{
+			//XBMC->Log(LOG_DEBUG, "%s - response: %s", __FUNCTION__, response.Left(800).c_str());
+		//}
+
+		resultCode = HTTP_OK;
 		XBMC->CloseFile(hFile);
 	}
 	else
 	{
-		XBMC->Log(LOG_ERROR, "can not open %s for write", url.c_str());
+		XBMC->Log(LOG_ERROR, "can not open %s for post request", url.c_str());
 	}
 
 	//XBMC->Log(LOG_DEBUG, "%s - exit --", __FUNCTION__);

@@ -1,7 +1,7 @@
 # Kodi Media Center language file
 # Addon Name: ZTV PVR Client
 # Addon id: pvr.ztv
-# Addon version: 1.10.0.0
+# Addon version: 2.1.1.0
 # Addon Provider: ViPetroFF
 msgid ""
 msgstr ""
@@ -81,6 +81,10 @@ msgstr ""
 
 msgctxt "#30015"
 msgid "Sorted by"
+msgstr ""
+
+msgctxt "#30016"
+msgid "Handles the input stream"
 msgstr ""
 
 #empty strings from id 30007 to 30039

@@ -1,6 +1,6 @@
 #pragma once
 /*
- *      Copyright (C) 2014 Viktor PetroFF
+ *      Copyright (C) 2017 Viktor PetroFF
  *      Copyright (C) 2011 Pulse-Eight
  *      http://www.pulse-eight.com/
  *
@@ -23,17 +23,16 @@
  */
 
 #include <map>
-#include <hash_map>
 #include <vector>
-#include "platform/util/StdString.h"
-#include "platform/threads/mutex.h"
+#include "p8-platform/util/StdString.h"
+//#include "platform/threads/mutex.h"
 #include "client.h"
 
 /*!
- * @brief PVR macros for string exchange
- */
-#define PVR_STRCPY(dest, source) do { strncpy(dest, source, sizeof(dest)-1); dest[sizeof(dest)-1] = '\0'; } while(0)
-#define PVR_STRCLR(dest) memset(dest, 0, sizeof(dest))
+* @brief PVR macros for string exchange
+*/
+//#define PVR_STRCPY(dest, source) do { strncpy(dest, source, sizeof(dest)-1); dest[sizeof(dest)-1] = '\0'; } while(0)
+//#define PVR_STRCLR(dest) memset(dest, 0, sizeof(dest))
 
 enum EChannelsSort
 {
@@ -42,6 +41,12 @@ enum EChannelsSort
   name,
   ip,
   uri,
+};
+
+enum EInputStreamHandler
+{
+	ztv = 0,
+	kodi,
 };
 
 struct PVRDemoEpgEntry
@@ -93,59 +98,109 @@ class ILibVLCModule;
 class PVRDemoData
 {
 public:
-  PVRDemoData(bool bIsEnableOnLineEpg, LPCSTR lpszMCastIf);
-  virtual ~PVRDemoData(void);
+  PVRDemoData(EInputStreamHandler handler, bool bIsEnableOnLineEpg, LPCSTR lpszMCastIf);
+  ~PVRDemoData(void);
 
-  virtual bool VLCInit(LPCSTR lpszCA);
-  virtual void FreeVLC(void);
-  virtual void ProxyAddrInit(LPCSTR lpszIP, int iPort, bool bCaSupport);
-  virtual bool LoadChannelsData(const std::string& strM3uPath, bool bIsOnLineSource, bool bIsEnableOnLineGroups, EChannelsSort sortby);
-  virtual int GetChannelsAmount(void);
-  virtual PVR_ERROR GetChannels(ADDON_HANDLE handle, bool bRadio);
-  virtual bool GetChannel(const PVR_CHANNEL &channel, PVRDemoChannel &myChannel);
+  bool VLCInit(LPCSTR lpszCA);
+  void FreeVLC(void);
+  std::string ProxyAddrInit(LPCSTR lpszIP, int iPort, bool bCaSupport);
+  bool LoadChannelsData(const std::string& strM3uPath, bool bIsOnLineSource, bool bIsEnableOnLineGroups, EChannelsSort sortby);
+  int GetChannelsAmount(void);
+  PVR_ERROR GetChannels(ADDON_HANDLE handle, bool bRadio);
+  bool GetChannel(const PVR_CHANNEL &channel, PVRDemoChannel &myChannel);
 
-  virtual int GetChannelGroupsAmount(void);
-  virtual PVR_ERROR GetChannelGroups(ADDON_HANDLE handle, bool bRadio);
-  virtual PVR_ERROR GetChannelGroupMembers(ADDON_HANDLE handle, const PVR_CHANNEL_GROUP &group);
+  int GetChannelGroupsAmount(void);
+  PVR_ERROR GetChannelGroups(ADDON_HANDLE handle, bool bRadio);
+  PVR_ERROR GetChannelGroupMembers(ADDON_HANDLE handle, const PVR_CHANNEL_GROUP &group);
 
-  virtual PVR_ERROR GetEPGForChannel(ADDON_HANDLE handle, const PVR_CHANNEL &channel, time_t iStart, time_t iEnd);
-  virtual PVR_ERROR RequestWebEPGForChannel(ADDON_HANDLE handle, const PVRDemoChannel& channel, time_t iStart, time_t iEnd);
+  PVR_ERROR GetEPGForChannel(ADDON_HANDLE handle, const PVR_CHANNEL &channel, time_t iStart, time_t iEnd);
+  PVR_ERROR RequestWebEPGForChannel(ADDON_HANDLE handle, const PVRDemoChannel& channel, time_t iStart, time_t iEnd);
 
-  virtual bool OpenLiveStream(const PVR_CHANNEL &channelinfo);
-  virtual void CloseLiveStream();
-  virtual bool SwitchChannel(const PVR_CHANNEL &channelinfo);
-  virtual int ReadLiveStream(unsigned char *pBuffer, unsigned int iBufferSize);
-  virtual int GetCurrentClientChannel();
-  virtual const char * GetLiveStreamURL(const PVR_CHANNEL &channel);
-  virtual bool CanPauseStream();
+  bool OpenLiveStream(const PVR_CHANNEL &channelinfo);
+  void CloseLiveStream();
+  bool SwitchChannel(const PVR_CHANNEL &channelinfo);
+  int ReadLiveStream(unsigned char *pBuffer, unsigned int iBufferSize);
+  int GetCurrentClientChannel();
+  const char * GetLiveStreamURL(const PVR_CHANNEL &channel);
+  bool CanPauseStream();
   void PauseStream(bool bPaused);
   bool CanSeekStream();
+  bool IsTimeshifting();
+  time_t GetPlayingTime();
+  time_t GetBufferTimeStart();
+  time_t GetBufferTimeEnd();
+  bool IsRealTimeStream();
 
-  virtual std::string GetIconPath(LPCSTR lpszIcoFName) const;
+  std::string GetIconPath(LPCSTR lpszIcoFName) const;
+
+  const char* GetCaServerHostname() const { return ZTV_CASERVER_HOSTNAME; }
+  const char* GetCaServerUri() const { return ZTV_CASERVER_URI; }
 protected:
-  virtual bool LoadWebXmlData(const std::string& strMac, bool bIsEnableOnLineGroups);
-  virtual bool LoadWebXmlGroups();
-  virtual bool LoadWebXmlChannels(const std::string& strMac);
-  virtual bool LoadM3UList(const std::string& strM3uUri);
+  bool LoadWebXmlData(const std::string& strMac, bool bIsEnableOnLineGroups);
+  bool LoadWebXmlGroups();
+  bool LoadWebXmlChannels(const std::string& strMac);
+  bool LoadM3UList(const std::string& strM3uUri);
   int DoHttpRequest(const CStdString& resource, const CStdString& body, CStdString& response);
   CStdString PVRDemoData::ReadMarkerValue(std::string &strLine, const char* strMarkerName);
   int GetChannelId(const char * strStreamUrl);
   int GetChannelId(unsigned int uiChannelId);
 private:
+  static const char* ZTV_CASERVER_HOSTNAME;
   static const char* ZTV_CASERVER_URI;
   static const char* ZTV_EPGSERVER_URI;
+
+  struct AverageSpeed
+  {
+
+	  const double MIN_DOWNLOAD_SPEED = 125000.0f;
+
+	  AverageSpeed()
+	  {
+		  _llLength = 0;
+		  _timeDuration = 0;
+	  }
+
+	  double GetAverage() const
+	  {
+		  //double speed = (0 == _llLength) ? 0 : (_llLength / _timeDuration);
+		  //return (speed > 0 && speed < MIN_DOWNLOAD_SPEED)? MIN_DOWNLOAD_SPEED:speed;
+		  return (0 == _llLength) ? 0 : (_llLength / _timeDuration);
+	  }
+
+	  double AddValue(int64_t len, double time)
+	  {
+		  if (time > 0)
+		  {
+			  _llLength += len;
+			  _timeDuration += time;
+		  }
+
+		  return GetAverage();
+	  }
+
+  private:
+	  int64_t _llLength;
+	  double _timeDuration;
+  };
 
   std::map<std::wstring, int>      m_mapLogo;
   std::vector<PVRDemoChannelGroup> m_groups;
   std::vector<PVRDemoChannel>      m_channels;
-  time_t                           m_iEpgStart;
+  AverageSpeed                     m_StreamSpeed;
+  time_t                           m_timeSpeedLastChanged;
+  int                              m_iPauseDuration;
+  double                           m_LastSpeed;
+  double                           m_LastSpeedDownload;
+  int64_t                          m_llLastStreamPos;
+  int64_t                          m_llStreamCurrentLength;
   CStdString                       m_strDefaultIcon;
   CStdString                       m_strDefaultMovie;
   CStdString                       m_strProxyAddr;
-  PLATFORM::CMutex                 m_mutex;
+  //PLATFORM::CMutex                 m_mutex;
   LibVLCCAPlugin::ILibVLCModule*   m_ptrVLCCAModule;
   IStream*                         m_currentStream;
   PVRDemoChannel                   m_currentChannel;
+  EInputStreamHandler              m_StreamHandler;
   ULONG                            m_ulMCastIf;
   bool                             m_bIsEnableOnLineEpg;
   bool                             m_bCaSupport;

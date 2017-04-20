@@ -6,7 +6,7 @@
     <setting id="chansource" type="enum" label="30000" values="m3u|online" default="m3u"/>
 	<setting id="sepm3u" label="30010" type="lsep" visible="eq(-1,0)"/>
 	<setting id="m3utype" type="enum" label="30009" values="file|url" default="file" visible="eq(-2,0)" enable="eq(-2,0)"/>
-	<setting id="filem3u" type="file" label="30008" default="special://home/addons/pvr.ztv/iptv.m3u" mask="*.m3u|*.m3u8" visible="eq(-3,0)" enable="eq(-1,0)"/>	
+	<setting id="filem3u" type="file" label="30008" default="special://home/addons/pvr.ztv/iptv.m3u8" mask="*.m3u|*.m3u8" visible="eq(-3,0)" enable="eq(-1,0)"/>	
     <setting id="urlm3u" type="text" label="30007" default="http://localhost:7781/iptv.m3u" visible="eq(-4,0)" enable="eq(-2,1)"/>
 	<setting id="sepm3u" label="30011" type="lsep" visible="eq(-5,1)"/>
 	<setting id="groupenable" type="bool" label="30001" default="true" visible="!eq(-6,0)" enable="eq(-6,1)"/>
@@ -22,6 +22,7 @@
 
   <!-- Advanced -->
   <category label="30042">
+	<setting id="inputstream" type="enum" label="30016" values="ztv|kodi" default="ztv"  enable="eq(3,false)"/>
   	<setting id="mcastif" type="ipaddress" label="30004" default="255.255.255.255"/>
 	<setting id="epgenable" type="bool" label="30003" default="true"/>
 	<setting id="caenable" type="bool" label="30005" default="false"/>

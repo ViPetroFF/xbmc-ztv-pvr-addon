@@ -1,5 +1,5 @@
 /*
- *      Copyright (C) 2013 Viktor PetroFF
+ *      Copyright (C) 2017 Viktor PetroFF
  *
  *  This Program is free software; you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
@@ -19,22 +19,16 @@
  *
  */
 
-#include "platform/util/StdString.h"
-#include "utils.h"
+#include "Ws2tcpip.h"
+#include "p8-platform/util/StdString.h"
+#include "p8-platform/util/StringUtils.h"
 #include "comstream.h"
 #include "netstream.h"
 
 using namespace std;
 using namespace ADDON;
 
-#ifndef IPV6_ADD_MEMBERSHIP
-#define IPV6_ADD_MEMBERSHIP IPV6_JOIN_GROUP
-#define IPV6_DROP_MEMBERSHIP IPV6_LEAVE_GROUP
-#endif
-
-#define UDP_TX_BUF_SIZE 32768
 #define UDP_MAX_PKT_SIZE 65536
-#define UDP_HEADER_SIZE 8
 
 namespace LibNetStream 
 {
@@ -64,7 +58,7 @@ friend class INetStreamFactory;
 			strHost.TrimLeft('@');
 
 			vector<string> arrHost;
-			Tokenize(strHost, arrHost, "@");
+			StringUtils::Tokenize(strHost, arrHost, "@");
 
 			if(2 == arrHost.size())
 			{
@@ -73,7 +67,7 @@ friend class INetStreamFactory;
 			}
 
 			arrHost.clear();
-			Tokenize(strHost, arrHost, ":");
+			StringUtils::Tokenize(strHost, arrHost, ":");
 
 			ndx = 0;
 			if (ndx < arrHost.size())
@@ -94,7 +88,7 @@ friend class INetStreamFactory;
 		if(!strLocal.IsEmpty())
 		{
 			vector<string> arrHost;
-			Tokenize(strLocal, arrHost, ":");
+			StringUtils::Tokenize(strLocal, arrHost, ":");
 
 			ulMCastIf = inet_addr(arrHost[0].c_str());
 		}
@@ -128,33 +122,30 @@ friend class INetStreamFactory;
 		bool reuse_socket=true;
         if (setsockopt(_sd, SOL_SOCKET, SO_REUSEADDR, (const char *)&reuse_socket, sizeof(reuse_socket)) != 0)
 		{
-			closesocket(_sd);
 			ThrowException("setsockopt SO_REUSEADDR");
 		}
 
 		int len = sizeof(_sockaddr);
-        int bind_ret = ::bind(_sd, (struct sockaddr *)&_sockaddr, len);
+        //int bind_ret = ::bind(_sd, (struct sockaddr *)&_sockaddr, len);
 
 		struct sockaddr_in addr=_sockaddr;
-		//addr.sin_addr.s_addr = htonl(INADDR_ANY);
+		//addr.sin_addr.s_addr = INADDR_ANY;
 		addr.sin_addr.s_addr = _ulMCastIf;
 
-		if (bind_ret < 0) && ::bind(_sd, (struct sockaddr *)&addr, len) < 0)
+		//if (bind_ret < 0) //&& ::bind(_sd, (struct sockaddr *)&addr, len) < 0)
+		if (::bind(_sd, (struct sockaddr *)&addr, len) < 0)
 		{
-			closesocket(_sd);
 			ThrowException("bind");
 		}
 
         if (udp_join_multicast_group(_sd, (struct sockaddr *)&_sockaddr) < 0)
 		{
-			closesocket(_sd);
 			ThrowException("udp_join_multicast_group");
 		}
 
 		int tmp = UDP_MAX_PKT_SIZE;
         if (setsockopt(_sd, SOL_SOCKET, SO_RCVBUF, (const char *)&tmp, sizeof(tmp)) < 0)
 		{
-			closesocket(_sd);
 			ThrowException("setsockopt SO_RCVBUF");
         }
 
@@ -172,7 +163,6 @@ friend class INetStreamFactory;
 		int rc = select (_sd, &fds, NULL, NULL, &tv ) ;
 		if (!rc)
 		{
-			closesocket(_sd);
 			SetLastError(WSAETIMEDOUT);
 			ThrowException("Initial read operation timed out.");
 		}
@@ -242,7 +232,7 @@ protected:
 	#ifdef IP_ADD_MEMBERSHIP
 		if (addr->sa_family == AF_INET)
 		{
-			struct ip_mreq mreq;
+			IP_MREQ mreq;
 
 			mreq.imr_multiaddr.s_addr = ((struct sockaddr_in *)addr)->sin_addr.s_addr;
 			mreq.imr_interface.s_addr= _ulMCastIf;
@@ -270,7 +260,7 @@ protected:
 	#ifdef IP_DROP_MEMBERSHIP
 		if (addr->sa_family == AF_INET)
 		{
-			struct ip_mreq mreq;
+			IP_MREQ mreq;
 
 			mreq.imr_multiaddr.s_addr = ((struct sockaddr_in *)addr)->sin_addr.s_addr;
 			mreq.imr_interface.s_addr= _ulMCastIf;
@@ -328,7 +318,6 @@ public:
 		}
 		else
 		{
-			//throw new ObjectDisposedException("AccessVLCObject");
 			hr = HRESULT_FROM_WIN32(ERROR_OBJECT_NOT_FOUND);
 		}
 
@@ -435,6 +424,11 @@ protected:
 	void ThrowException(LPCSTR szFuncName)
 	{
 		int iErrCode = getLastError();
+		if (INVALID_SOCKET != _sd)
+		{
+			closesocket(_sd);
+		}
+		_sd = INVALID_SOCKET;
 		throw system_error(iErrCode, system_category(), errormessage(iErrCode, szFuncName).c_str());
 	}
 
@@ -549,7 +543,6 @@ public:
 		}
 		else
 		{
-			//throw new ObjectDisposedException("AccessVLCObject");
 			hr = HRESULT_FROM_WIN32(ERROR_OBJECT_NOT_FOUND);
 		}
 

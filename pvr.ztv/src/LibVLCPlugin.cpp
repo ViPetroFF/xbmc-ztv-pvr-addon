@@ -19,6 +19,7 @@
  *
  */
 
+#include "p8-platform/util/StringUtils.h"
 #include "comstream.h"
 #include "LibVLCPlugin.h"
 
@@ -62,7 +63,7 @@ static LONG (WINAPI *InvokeFuncPvoidStrStrStr)(PVOID funcptr, PVOID pLibVLC, LPC
 static LONG (WINAPI *InvokeFuncStrWord)(PVOID funcptr, LPCSTR strIp, WORD wPort) =
 	reinterpret_cast<LONG (WINAPI *)(PVOID funcptr, LPCSTR strIp, WORD wPort)>(InvokeFunc);
 
-
+#if 0
 void Tokenize(const string& str, vector<string>& tokens, const string& delimiters = " ")
 {
   string::size_type start_pos = 0;
@@ -76,6 +77,7 @@ void Tokenize(const string& str, vector<string>& tokens, const string& delimiter
     // Find next "non-delimiter"
   }
 }
+#endif // 0
 
 class CLibVLCAccess;
 
@@ -278,7 +280,7 @@ public:
 				CStdString strAccess = strMrl.Mid(0, ndx);
                 CStdString strPath = strMrl.Mid(ndx + 3);
                 vector<string> arrAccessDemux;
-				Tokenize(strAccess, arrAccessDemux, "/");
+				StringUtils::Tokenize(strAccess, arrAccessDemux, "/");
 
                 CStdString strDemux;
                 ndx = 0;
@@ -486,7 +488,7 @@ void CLibVLCModule::LibVLCRelease()
 
     if (NULL != _pLibVLCHandle)
     {
-        //libvlc_release(_pLibVLCHandle);   // if uncomment this line, may crush with error while exit from kodi.
+        libvlc_release(_pLibVLCHandle);   // if uncomment this line, may crush with error while exit from kodi.
         _pLibVLCHandle = NULL;
     }
 

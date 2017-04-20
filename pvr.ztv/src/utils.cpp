@@ -16,15 +16,15 @@
  *  along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
-#ifdef TARGET_WINDOWS
-#pragma warning(disable:4244) //wchar to char = loss of data
-#endif
+//#ifdef TARGET_WINDOWS
+//#pragma warning(disable:4244) //wchar to char = loss of data
+//#endif
 
 #include "client.h"
 #include "utils.h"
 #include <string>
 #include <stdio.h>
-#include "platform/util/StdString.h"
+//#include "p8-platform/util/StdString.h"
 
 using namespace std;
 using namespace ADDON;
@@ -133,7 +133,8 @@ std::string ToThumbFileName(const char* strChannelName)
   return strThumbName;
 }
 
-#if defined(TARGET_WINDOWS)
+//#if defined(TARGET_WINDOWS)
+#if defined(DISABLE_THIS_CODE)
 
 CStdStringA WideCharToMultiByte(const wchar_t *s)
 {

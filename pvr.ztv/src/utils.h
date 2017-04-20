@@ -20,11 +20,11 @@
 #include <string>
 #include <vector>
 #include <ctime>
-#include "platform/util//util.h"
+//#include "p8-platform/util/util.h"
 
-#ifdef TARGET_WINDOWS
-#include "platform/util/StdString.h"
-#endif
+//#ifdef TARGET_WINDOWS
+#include "p8-platform/util/StdString.h"
+//#endif
 
 using namespace std;
 
@@ -51,7 +51,8 @@ time_t DateTimeToTimeT(const std::string& datetime);
  */
 std::string ToThumbFileName(const char* strChannelName);
 
-#if defined(TARGET_WINDOWS)
+//#if defined(TARGET_WINDOWS)
+#if defined(DISABLE_THIS_CODE)
 
 CStdStringA WideCharToMultiByte(const wchar_t *s);
 

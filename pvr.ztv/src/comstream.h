@@ -116,7 +116,7 @@ public:
         return E_NOTIMPL;
 	}
 
-    virtual HRESULT STDMETHODCALLTYPE Stat(STATSTG* pStatstg, DWORD grfStatFlag) 
+    virtual HRESULT STDMETHODCALLTYPE Stat(STATSTG* pStatstg, DWORD grfStatFlag)
     {
         return E_NOTIMPL;
 	}
