@@ -22,10 +22,11 @@
 
   <!-- Advanced -->
   <category label="30042">
-	<setting id="inputstream" type="enum" label="30016" values="ztv|kodi" default="ztv"  enable="eq(3,false)"/>
+	<setting id="proxyenable" type="bool" label="30012" visible="false"/>
+	<setting id="inputstream" type="enum" label="30016" values="ztv|kodi" default="ztv"  enable="eq(3,false)|eq(-1,true)"/>
   	<setting id="mcastif" type="ipaddress" label="30004" default="255.255.255.255"/>
 	<setting id="epgenable" type="bool" label="30003" default="true"/>
 	<setting id="caenable" type="bool" label="30005" default="false"/>
-    <setting id="ca" type="text" label="30006" default="http://127.0.0.1:7781/ca/" visible="eq(-1,true)" enable="eq(-1,true)"/>
+    <setting id="ca" type="text" label="30006" default="http://127.0.0.1:7781/ca/" visible="eq(-1,true)" enable="eq(-1,true)+eq(-5,false)"/>
   </category>  
 </settings>
