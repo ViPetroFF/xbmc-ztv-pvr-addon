@@ -133,9 +133,8 @@ private:
 
 	CStdString _strConfigPath;
 	CStdString _strCaHost;
-    HANDLE _hmodCALibVLCHook;
+    HMODULE _hmodCALibVLCHook;
 	HANDLE _hmodLibVLC;
-	HANDLE _hmodVLCCore;
     libvlc_instance_t* _pLibVLCHandle;
     CLibVLCAccess* _pLibAccess;
 	DWORD (WINAPI *_GetBestMacAddress)(PUCHAR uchPhysAddr, DWORD dwSize);
@@ -376,7 +375,6 @@ CLibVLCModule::CLibVLCModule(const CStdString& cstrConfigPath, const CStdString&
 {
     _hmodCALibVLCHook = NULL;
 	_hmodLibVLC = NULL;
-	_hmodVLCCore = NULL;
     _pLibVLCHandle = NULL;
     _pLibAccess = NULL;
 	_GetBestMacAddress = NULL;
@@ -492,12 +490,6 @@ void CLibVLCModule::LibVLCRelease()
         _pLibVLCHandle = NULL;
     }
 
-    if (NULL != _hmodVLCCore)
-    {
-        dlclose(_hmodVLCCore);
-        _hmodVLCCore = NULL;
-    }
-
     if (NULL != _hmodLibVLC)
     {
         dlclose(_hmodLibVLC);
@@ -506,7 +498,8 @@ void CLibVLCModule::LibVLCRelease()
 
     if (NULL != _hmodCALibVLCHook)
     {
-        dlclose(_hmodCALibVLCHook);
+        //dlclose(_hmodCALibVLCHook);
+		FreeLibrary(_hmodCALibVLCHook);
 		_hmodCALibVLCHook = NULL;
     }
 }
@@ -518,14 +511,18 @@ bool CLibVLCModule::CALibVLCHookLoad()
     
 	if (XBMC->FileExists(strCALibVLCHookFilePath, false))
     {
-		HANDLE hmodCALibVLCHook = dlopen(strCALibVLCHookFilePath, RTLD_LAZY);
+		//HANDLE hmodCALibVLCHook = dlopen(strCALibVLCHookFilePath, RTLD_LAZY);
+		HMODULE hmodCALibVLCHook = LoadLibrary(strCALibVLCHookFilePath);
+
+		if (NULL == hmodCALibVLCHook && ERROR_MOD_NOT_FOUND == GetLastError())
+		{
+			hmodCALibVLCHook = LoadLibrary(_cstrCALibVLCHookFileName);
+		}
+
 		if (NULL != hmodCALibVLCHook)
         {
-			PVOID funcaddr = dlsym(hmodCALibVLCHook, "_CAServerAddressInit@8");
-            //if (0 != funcaddr)
-            //{
-                //funcaddr = dlsym(hmodCALibVLCHook, "_GetBestMacAddress@8");
-            //}
+			//PVOID funcaddr = dlsym(hmodCALibVLCHook, "_CAServerAddressInit@8");
+			PVOID funcaddr = GetProcAddress(hmodCALibVLCHook, "_CAServerAddressInit@8");
 
             if (0 != funcaddr)
             {
@@ -534,14 +531,17 @@ bool CLibVLCModule::CALibVLCHookLoad()
             }
             else
             {
-				system_error err(GetLastError(), system_category(), dlerror());
-				dlclose(hmodCALibVLCHook);
+				//system_error err(GetLastError(), system_category(), dlerror());
+				//dlclose(hmodCALibVLCHook);
+				system_error err(GetLastError(), system_category(), "GetProcAddress failed");
+				FreeLibrary(hmodCALibVLCHook);
 				throw err;
             }
         }
         else
         {
-			throw system_error(GetLastError(), system_category(), dlerror());
+			//throw system_error(GetLastError(), system_category(), dlerror());
+			throw system_error(GetLastError(), system_category(), "LoadLibrary failed");
         }
     }
 
@@ -553,12 +553,10 @@ void CLibVLCModule::CALibVLCHookInit(LPCSTR lpszCAMac, ULONG ulMCastIPAddr, int 
     if (NULL != _hmodCALibVLCHook)
     {
 		HRESULT (WINAPI *funcaddrInit)(LPCSTR lpszIP, WORD wPort)=
-			reinterpret_cast<HRESULT (WINAPI *)(LPCSTR lpszIP, WORD wPort)>(dlsym(_hmodCALibVLCHook, "_CAServerAddressInit@8"));
+			reinterpret_cast<HRESULT (WINAPI *)(LPCSTR lpszIP, WORD wPort)>(GetProcAddress(_hmodCALibVLCHook, "_CAServerAddressInit@8"));
 
 		if (NULL != funcaddrInit)
         {
-			//PVOID funcaddrGet = dlsym(_hmodCALibVLCHook, "_GetBestMacAddress@8");
-			//if (NULL != funcaddrGet)
 			{
 				CStdString strMCastIPAddr;
 				LPCSTR szMCastIPAddr=NULL;
@@ -578,31 +576,21 @@ void CLibVLCModule::CALibVLCHookInit(LPCSTR lpszCAMac, ULONG ulMCastIPAddr, int 
 				HRESULT status = funcaddrInit(szMCastIPAddr, static_cast<WORD>(iCAPort));
 				if (FAILED(status))
 				{
-					//throw new Win32Exception((int)status);
 					SetLastError(status);
-					throw system_error(GetLastError(), system_category(), dlerror());
+					throw system_error(GetLastError(), system_category(), "CAServerAddressInit failed");
 				}
-				//_GetBestMacAddress = reinterpret_cast<DWORD (WINAPI *)(PUCHAR uchPhysAddr, DWORD dwSize)>(funcaddrGet);
 			}
-			//else
-			//{
-				//int iErrCode = Marshal.GetLastWin32Error();
-				//throw new Win32Exception(Marshal.GetLastWin32Error());
-				//throw system_error(GetLastError(), system_category(), dlerror());
-			//}
         }
         else
         {
-            //int iErrCode = Marshal.GetLastWin32Error();
-            //throw new Win32Exception(Marshal.GetLastWin32Error());
-			throw system_error(GetLastError(), system_category(), dlerror());
+			throw system_error(GetLastError(), system_category(), "GetProcAddress failed");
         }
     }
     else
     {
         //throw new Win32Exception((int)1157L);
 		SetLastError(ERROR_DLL_NOT_FOUND);
-		throw system_error(GetLastError(), system_category(), dlerror());
+		throw system_error(GetLastError(), system_category(), "LoadLibrary failed");
     }
 }
 
@@ -610,6 +598,12 @@ void CLibVLCModule::LibVLCInit(const CStdStringArray& args)
 {
 	CStdString strLibVLCFilePath = _strConfigPath + _cstrLibVLCFileName;
 	_hmodLibVLC = dlopen(strLibVLCFilePath, RTLD_LAZY);
+
+	if (NULL == _hmodLibVLC && ERROR_MOD_NOT_FOUND == GetLastError())
+	{
+		_hmodLibVLC = dlopen(_cstrLibVLCFileName, RTLD_LAZY);
+	}
+
 	if (NULL != _hmodLibVLC)
 	{
 		libvlc_exception_init = reinterpret_cast<void (*)(libvlc_exception_t* pExp)>(dlsym(_hmodLibVLC, "libvlc_exception_init"));
@@ -653,25 +647,26 @@ void CLibVLCModule::LibVLCInit(const CStdStringArray& args)
 	libvlc_instance_t* pLibVLC = libvlc_new(args.size(), arrArgs, &exp);
     if (0 != libvlc_exception_raised(&exp))
     {
-        //Console.WriteLine("Error: {0}", exp.psz_message);
-        //throw new Win32Exception(exp.psz_message);
 		throw system_error(-1, system_category(), exp.psz_message);
     }
     else
     {
-        //_instanceVLC = (libvlc_instance_t)Marshal.PtrToStructure(pLibVLC, typeof(libvlc_instance_t));
         _pLibVLCHandle = pLibVLC;
     }
 }
 
 void CLibVLCModule::LibVLCCoreInit()
 {
-	CStdString strLibVLCCoreFilePath = _strConfigPath + _cstrLibVLCCoreFileName;
+	//CStdString strLibVLCCoreFilePath = _strConfigPath + _cstrLibVLCCoreFileName;
 	
-	_hmodVLCCore = dlopen(strLibVLCCoreFilePath, RTLD_LAZY);
-    if (NULL != _hmodVLCCore)
+	//_hmodVLCCore = dlopen(strLibVLCCoreFilePath, RTLD_LAZY);
+	//_hmodVLCCore = LoadLibrary(strLibVLCCoreFilePath);
+
+	HMODULE hmodVLCCore = GetModuleHandle(_cstrLibVLCCoreFileName);
+
+    if (NULL != hmodVLCCore)
     {
-		DWORD funcaddr = reinterpret_cast<DWORD>(dlsym(_hmodVLCCore, "input_item_SetMeta"));
+		DWORD funcaddr = reinterpret_cast<DWORD>(GetProcAddress(hmodVLCCore, "input_item_SetMeta"));
         if (0 != funcaddr)
         {
             PVOID funcAccessNew = (PVOID)(funcaddr + 0x300);
@@ -680,14 +675,12 @@ void CLibVLCModule::LibVLCCoreInit()
         }
         else
         {
-            //throw new Win32Exception(Marshal.GetLastWin32Error());
-			throw system_error(GetLastError(), system_category(), dlerror());
+			throw system_error(GetLastError(), system_category(), "GetProcAddress failed");
         }
     }
     else
     {
-        //throw new Win32Exception(Marshal.GetLastWin32Error());
-		throw system_error(GetLastError(), system_category(), dlerror());
+		throw system_error(GetLastError(), system_category(), "GetModuleHandle failed");
     }
 }
 
